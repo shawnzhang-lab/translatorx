@@ -3,6 +3,7 @@ config.js
 
 # OS / editor cruft
 .DS_Store
+*.log
 
 # Planning / intermediate files (kept local, not published)
 architecture.excalidraw

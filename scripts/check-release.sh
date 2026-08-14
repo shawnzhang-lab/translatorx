@@ -28,6 +28,7 @@ public_allowlist=(
   "manifest.json"
   "background.js"
   "settings.js"
+  "ui-language.js"
   "content.js"
   "sidepanel.html"
   "sidepanel.css"
@@ -38,6 +39,10 @@ public_allowlist=(
   "icons/icon16.png"
   "icons/icon48.png"
   "icons/icon128.png"
+  "icons/translatorx-button-avatar-48.png"
+  "icons/translatorx-success-ok-48.png"
+  "icons/translatorx-thinking-192.png"
+  "icons/translatorx-waiting-sprite.png"
   "prompts/analysis.md"
   "prompts/explain.md"
   "prompts/note-cleanup.md"
@@ -46,6 +51,7 @@ public_allowlist=(
   "README.zh-CN.md"
   "PRIVACY.md"
   "SECURITY.md"
+  "NOTICE"
   "LICENSE"
 )
 
@@ -53,6 +59,7 @@ required_public_files=(
   "manifest.json"
   "background.js"
   "settings.js"
+  "ui-language.js"
   "content.js"
   "sidepanel.html"
   "sidepanel.css"
@@ -60,10 +67,15 @@ required_public_files=(
   "icons/icon16.png"
   "icons/icon48.png"
   "icons/icon128.png"
+  "icons/translatorx-button-avatar-48.png"
+  "icons/translatorx-success-ok-48.png"
+  "icons/translatorx-thinking-192.png"
+  "icons/translatorx-waiting-sprite.png"
   "README.md"
   "README.zh-CN.md"
   "PRIVACY.md"
   "SECURITY.md"
+  "NOTICE"
   "LICENSE"
 )
 
@@ -227,7 +239,9 @@ for file in "${javascript_files[@]}"; do
 done
 
 if compgen -G "tests/*.test.js" >/dev/null; then
-  node --test tests/*.test.js
+  # Keep --print-files machine-readable for package-extension.sh. Test output
+  # remains visible to people on stderr but cannot be mistaken for file paths.
+  node --test tests/*.test.js >&2
 fi
 
 if ((${#javascript_files[@]} > 0)); then

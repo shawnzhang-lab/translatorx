@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "YouTube Digest",
-  "version": "1.1.4",
+  "name": "TranslatorX",
+  "version": "1.5.13",
   "minimum_chrome_version": "116",
-  "description": "Turn YouTube videos into learning resources with transcripts, bilingual translation, AI overviews, and notes.",
+  "description": "TranslatorX turns YouTube videos into bilingual transcripts, AI overviews, and timestamped notes.",
+  "homepage_url": "https://github.com/shawnzhang-lab/translatorx",
   "permissions": ["sidePanel", "storage", "tabs", "scripting"],
   "host_permissions": [
     "https://www.youtube.com/*",
@@ -11,7 +12,7 @@
     "https://api.deepseek.com/*"
   ],
   "action": {
-    "default_title": "Open YouTube Digest",
+    "default_title": "Open TranslatorX",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -31,8 +32,17 @@
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["content.js"],
+      "js": ["ui-language.js", "content.js"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/translatorx-button-avatar-48.png",
+        "icons/translatorx-success-ok-48.png"
+      ],
+      "matches": ["https://www.youtube.com/*"]
     }
   ],
   "icons": {

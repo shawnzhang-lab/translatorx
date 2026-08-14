@@ -1,12 +1,11 @@
 /*
- * SIDE PANEL STYLES — "Calm Terracotta" (Light Mode)
+ * SIDE PANEL STYLES — "TranslatorX Signal" (Light Mode)
  *
  * Design philosophy:
- * - Warm, editorial, unhurried. The opposite of shouty.
- * - Soft cream paper background; white cards float on it with gentle shadows.
- * - Rounded corners everywhere (no sharp brutalist edges).
- * - Terracotta is the single warm accent, used sparingly; sage is a quiet
- *   secondary. Red is gone.
+ * - Cool, precise reading surfaces with a restrained AI signal layer.
+ * - Deep indigo carries structure; electric violet is the only bright accent.
+ * - White remains the main reading surface so long transcripts stay calm.
+ * - A faint grid and cool glow suggest technology without visual noise.
  * - Fully sans-serif, using system fonts so the extension makes no font
  *   requests to third parties.
  */
@@ -15,29 +14,34 @@
    CSS VARIABLES (design tokens)
    ============================================================ */
 :root {
-  /* Surfaces & ink — all warm-toned, never pure grey */
-  --bg: #f7f3ec;
+  /* Surfaces & ink */
+  --bg: #f4f6fc;
   --surface: #ffffff;
-  --surface-raised: #fbf8f2;
-  --border: #ece5d9;
-  --border-heavy: #ddd4c4;
-  --text: #2e2a24;
-  --text-secondary: #6b6258;
-  --text-muted: #a39a8d;
+  --surface-raised: #eef1fb;
+  --surface-soft: #f8f9ff;
+  --border: #e0e4f2;
+  --border-heavy: #cdd3e8;
+  --text: #171a3d;
+  --text-secondary: #555f7e;
+  --text-muted: #8a92ad;
 
   /* Accents */
-  --accent: #c8674f; /* terracotta */
-  --accent-hover: #b25742;
-  --accent-dim: rgba(200, 103, 79, 0.1);
-  --sage: #7c8b6f; /* quiet secondary */
-  --sage-dim: rgba(124, 139, 111, 0.14);
-  --success: #7c8b6f;
-  --highlight: #d99a5b;
+  --accent: #5b5bd6;
+  --accent-hover: #4b4ac5;
+  --accent-bright: #806cff;
+  --accent-cyan: #6dd5ff;
+  --accent-dim: rgba(91, 91, 214, 0.1);
+  --accent-dim-strong: rgba(91, 91, 214, 0.16);
+  --accent-gradient: linear-gradient(135deg, #4d58cf 0%, #715cf1 62%, #5c79ee 100%);
+  --sage: #438b98;
+  --sage-dim: rgba(67, 139, 152, 0.12);
+  --success: #438b98;
+  --highlight: #7697f5;
 
-  /* Soft shadows give depth instead of heavy borders */
-  --shadow-sm: 0 1px 3px rgba(90, 80, 60, 0.06);
-  --shadow-md: 0 4px 16px rgba(90, 80, 60, 0.1);
-  --shadow-lg: 0 16px 48px rgba(50, 42, 32, 0.22);
+  /* Cool, low-contrast depth */
+  --shadow-sm: 0 1px 3px rgba(37, 43, 105, 0.08);
+  --shadow-md: 0 8px 24px rgba(42, 48, 123, 0.11);
+  --shadow-lg: 0 22px 56px rgba(24, 27, 74, 0.24);
 
   /* Rounding scale */
   --r-sm: 8px;
@@ -47,12 +51,12 @@
   --r-pill: 999px;
 
   /* Type — system fonts keep the extension self-contained. */
-  --font-display: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  --font-reading: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  --font-display: "Segoe UI Variable Display", "Aptos Display", system-ui,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body: "Segoe UI Variable Text", "Noto Sans SC", system-ui,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-reading: "Segoe UI Variable Text", "Noto Sans SC", system-ui,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
 }
 
@@ -86,6 +90,17 @@ body {
   flex-direction: column;
 }
 
+html:not([data-ui-language="en"]) [lang="en"],
+html[data-ui-language="en"] [lang="zh-CN"] {
+  display: none !important;
+}
+
+.panel-language-toggle {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Scrollbar — minimal, on-theme */
 ::-webkit-scrollbar {
   width: 6px;
@@ -108,11 +123,26 @@ body {
    HEADER
    ============================================================ */
 .header {
+  position: relative;
+  isolation: isolate;
   flex-shrink: 0;
   padding: 16px 20px 0;
-  background: var(--surface);
+  background:
+    radial-gradient(circle at 8% -30%, rgba(109, 213, 255, 0.14), transparent 38%),
+    radial-gradient(circle at 92% -20%, rgba(128, 108, 255, 0.14), transparent 42%),
+    var(--surface);
   border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 5px 18px rgba(40, 46, 113, 0.07);
+}
+
+.header::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-cyan), var(--accent-bright), transparent);
+  opacity: 0.78;
 }
 
 .header-top {
@@ -132,7 +162,7 @@ body {
   padding: 5px 10px;
   border: 1px solid var(--border);
   border-radius: var(--r-pill);
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.82);
   color: var(--text-secondary);
   cursor: pointer;
   font: 600 11px/1.4 var(--font-body);
@@ -144,22 +174,43 @@ body {
   background: var(--accent-dim);
 }
 
+.panel-language-toggle {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--accent);
+  cursor: pointer;
+  font: 700 11px/1.4 var(--font-body);
+}
+
+.panel-language-toggle:hover {
+  background: var(--accent-dim);
+}
+
+.panel-language-toggle:active {
+  transform: scale(0.98);
+}
+
 /* ============================================================
-   TAB NAVIGATION — pill tabs on the white header.
-   No background "track": the header is white and the content below is cream,
-   so the only thing in this strip is the muted labels + one terracotta pill.
-   That keeps the menu visually separate from the content area below it.
+   TAB NAVIGATION — quiet glass track with one clear signal.
    ============================================================ */
 .tabs {
   display: flex;
   gap: 4px;
   margin-top: 14px;
-  padding-bottom: 12px;
+  padding: 4px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(205, 211, 232, 0.8);
+  border-radius: var(--r-pill);
+  background: rgba(238, 241, 251, 0.7);
 }
 
 .tab {
   flex: 1;
   min-width: 0; /* let tabs shrink so all five fit narrow panels */
+  display: block;
   padding: 8px 2px;
   text-align: center;
   font-family: var(--font-body);
@@ -179,20 +230,20 @@ body {
 }
 
 .tab:hover {
-  color: var(--text-secondary);
-  background: var(--surface-raised);
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.7);
 }
 
-/* Active pill — terracotta fill on the white header */
+/* Active signal */
 .tab.active {
   color: #fff;
-  background: var(--accent);
-  box-shadow: 0 2px 8px rgba(200, 103, 79, 0.3);
+  background: var(--accent-gradient);
+  box-shadow: 0 6px 16px rgba(82, 80, 203, 0.28);
 }
 
 .tab.active:hover {
   color: #fff;
-  background: var(--accent);
+  background: var(--accent-gradient);
 }
 
 /* ============================================================
@@ -202,6 +253,13 @@ body {
   flex: 1;
   padding: 24px 20px 20px;
   overflow-y: auto;
+  scroll-behavior: smooth;
+  overflow-anchor: none;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 95% 2%, rgba(128, 108, 255, 0.08), transparent 26%),
+    radial-gradient(rgba(91, 91, 214, 0.09) 0.7px, transparent 0.7px);
+  background-size: auto, 18px 18px;
 }
 
 .tab-panel {
@@ -342,18 +400,21 @@ body {
   gap: 10px;
 }
 
-.transcript-mode-control {
+.transcript-mode-control,
+.language-mode-control {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   padding: 3px;
   border: 1px solid var(--border);
   border-radius: var(--r-pill);
-  background: var(--surface-raised);
+  background: rgba(238, 241, 251, 0.84);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
   white-space: nowrap;
 }
 
-.transcript-mode-btn {
+.transcript-mode-btn,
+.language-mode-btn {
   padding: 4px 8px;
   border: 0;
   border-radius: var(--r-pill);
@@ -363,14 +424,16 @@ body {
   font: 600 10.5px/1.3 var(--font-body);
 }
 
-.transcript-mode-btn:hover {
+.transcript-mode-btn:hover,
+.language-mode-btn:hover {
   color: var(--accent);
 }
 
-.transcript-mode-btn.active {
+.transcript-mode-btn.active,
+.language-mode-btn.active {
   background: var(--surface);
-  color: var(--text);
-  box-shadow: var(--shadow-sm);
+  color: var(--accent);
+  box-shadow: 0 2px 8px rgba(48, 54, 137, 0.12);
 }
 
 .translation-spinner {
@@ -501,6 +564,31 @@ body {
   line-height: 1.5;
 }
 
+.localized-original,
+.localized-translation {
+  display: block;
+}
+
+.localized-bilingual .localized-translation {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.localized-pending,
+.localized-error {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.localized-error {
+  color: var(--accent);
+}
+
+.localized-pending .anime-waiting {
+  font-style: normal;
+}
+
 /* ============================================================
    KEY QUOTES
    ============================================================ */
@@ -583,54 +671,25 @@ body {
    TRANSCRIPT TAB
    ============================================================ */
 
-/* Small badge showing where the transcript came from */
-.transcript-source-badge {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-family: var(--font-body);
-  font-weight: 500;
-  font-size: 11px;
-  letter-spacing: 0.2px;
-  color: var(--text-muted);
-  padding: 6px 0 12px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-/* Colored dot indicator */
-.source-dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-
-/* Sage dot = subtitles (the only source now) */
-.source-dot--subs {
-  background: var(--sage);
-}
-
-.source-dot--auto {
-  background: #6b8fb5;
-}
-
-.source-dot--ai {
-  background: var(--highlight);
-}
-
 .transcript-entry {
   display: flex;
+  align-items: flex-start;
   gap: 12px;
   padding: 11px 10px;
+  border: 1px solid transparent;
   border-radius: var(--r-sm);
   margin-bottom: 2px;
-  transition: background 0.14s ease;
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease,
+    box-shadow 0.14s ease,
+    opacity 0.18s ease;
   cursor: pointer;
 }
 
 .transcript-entry:hover {
-  background: var(--surface-raised);
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(205, 211, 232, 0.8);
 }
 
 .transcript-time {
@@ -671,6 +730,89 @@ body {
 
 .translation-pending {
   color: var(--text-muted);
+}
+
+.anime-waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  max-width: 100%;
+  color: #6964a9;
+  font-family: var(--font-reading);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.anime-waiting-mascot {
+  display: inline-block;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 50%;
+  background-image: url("icons/translatorx-waiting-sprite.png");
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  background-size: 200% 200%;
+  filter: drop-shadow(0 2px 5px rgba(49, 52, 126, 0.16));
+  animation:
+    translatorxMascotFrames 6.4s steps(1, end) infinite,
+    translatorxMascotBob 1.7s ease-in-out infinite;
+}
+
+.anime-waiting-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: translatorxWaitingText 1.7s ease-in-out infinite;
+}
+
+@keyframes translatorxMascotFrames {
+  0%,
+  24.99% {
+    background-position: 0 0;
+  }
+  25%,
+  49.99% {
+    background-position: 100% 0;
+  }
+  50%,
+  74.99% {
+    background-position: 0 100%;
+  }
+  75%,
+  100% {
+    background-position: 100% 100%;
+  }
+}
+
+@keyframes translatorxMascotBob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-2px) rotate(1.5deg);
+  }
+}
+
+@keyframes translatorxWaitingText {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anime-waiting-mascot,
+  .anime-waiting-text {
+    animation: none;
+  }
 }
 
 .translation-error {
@@ -771,13 +913,86 @@ body {
 
 /* Active playback highlight */
 .transcript-entry.active-playback {
-  background: var(--accent-dim);
+  background:
+    linear-gradient(110deg, rgba(91, 91, 214, 0.12), rgba(109, 213, 255, 0.07)),
+    var(--surface);
   border-left: 3px solid var(--accent);
+  border-top-color: rgba(91, 91, 214, 0.12);
+  border-right-color: rgba(91, 91, 214, 0.12);
+  border-bottom-color: rgba(91, 91, 214, 0.12);
+  box-shadow: 0 8px 22px rgba(55, 61, 142, 0.09);
 }
 
 .transcript-entry.active-playback .transcript-time {
   color: var(--accent);
   font-weight: 600;
+}
+
+/*
+ * Playback reading focus: the current bilingual segment becomes a calm,
+ * vertically generous reading zone. It is intentionally tied to follow mode,
+ * so manual scrolling restores the compact list instead of fighting the user.
+ */
+#transcriptList.is-following-playback:has(.transcript-entry.active-playback)
+  .transcript-entry:not(.active-playback) {
+  opacity: 0.72;
+}
+
+#transcriptList.is-following-playback
+  .transcript-entry.active-playback {
+  min-height: clamp(148px, 21vh, 188px);
+  align-items: center;
+  gap: 15px;
+  padding: 16px 14px 19px;
+  background:
+    radial-gradient(circle at 88% 18%, rgba(109, 213, 255, 0.15), transparent 36%),
+    linear-gradient(112deg, rgba(91, 91, 214, 0.16), rgba(128, 108, 255, 0.08) 58%, rgba(109, 213, 255, 0.09)),
+    var(--surface);
+  border-left-width: 4px;
+  border-color: rgba(91, 91, 214, 0.22);
+  box-shadow:
+    0 16px 36px rgba(55, 61, 142, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+}
+
+#transcriptList.is-following-playback
+  .transcript-entry.active-playback
+  .transcript-time {
+  align-self: center;
+  min-width: 50px;
+  padding-top: 0;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+#transcriptList.is-following-playback
+  .transcript-entry.active-playback
+  .transcript-copy {
+  align-self: center;
+}
+
+#transcriptList.is-following-playback
+  .transcript-entry.active-playback
+  .transcript-text {
+  font-size: 15px;
+  line-height: 1.66;
+  letter-spacing: 0.002em;
+}
+
+#transcriptList.is-following-playback
+  .transcript-entry.active-playback
+  .transcript-original {
+  color: #30385f;
+  font-weight: 520;
+}
+
+#transcriptList.is-following-playback
+  .transcript-entry.active-playback
+  .transcript-original
+  + .transcript-translation {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top-color: rgba(91, 91, 214, 0.18);
 }
 
 /* Follow playback button — floating pill */
@@ -787,7 +1002,7 @@ body {
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
-  background: var(--accent);
+  background: var(--accent-gradient);
   color: white;
   border: none;
   padding: 10px 22px;
@@ -798,11 +1013,11 @@ body {
   letter-spacing: 0.3px;
   cursor: pointer;
   transition: all 0.18s ease;
-  box-shadow: 0 6px 18px rgba(200, 103, 79, 0.4);
+  box-shadow: 0 10px 26px rgba(73, 72, 188, 0.34);
 }
 
 .follow-playback-btn:hover {
-  background: var(--accent-hover);
+  background: linear-gradient(135deg, #424dbf 0%, #6650e5 62%, #4d6fe4 100%);
   transform: translateX(-50%) translateY(-1px);
 }
 
@@ -835,7 +1050,7 @@ body {
   width: 60%;
   height: 100%;
   border-radius: var(--r-pill);
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent), var(--accent-cyan), var(--accent-bright));
   animation: loading 1.5s ease-in-out infinite;
 }
 
@@ -913,7 +1128,7 @@ body {
   cursor: pointer;
   transition: all 0.18s ease;
   margin-top: 8px;
-  box-shadow: 0 4px 14px rgba(200, 103, 79, 0.3);
+  box-shadow: 0 8px 20px rgba(73, 72, 188, 0.28);
 }
 
 .error-btn:hover {
@@ -935,13 +1150,16 @@ body {
   padding: 40px 24px;
 }
 
-/* A soft terracotta tile with a play glyph, matching the brand mark */
+/* Generated TranslatorX mascot mark: bilingual bubbles crossed by an X. */
 .welcome-icon {
   width: 84px;
   height: 84px;
-  border-radius: var(--r-xl);
-  background: linear-gradient(145deg, #d2735a, #bd5740);
-  box-shadow: 0 12px 30px rgba(200, 103, 79, 0.35);
+  border: 1px solid rgba(128, 108, 255, 0.24);
+  border-radius: 24px;
+  background: url("icons/icon128.png") center / cover no-repeat;
+  box-shadow:
+    0 16px 34px rgba(57, 58, 153, 0.25),
+    0 0 0 7px rgba(91, 91, 214, 0.06);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -950,11 +1168,7 @@ body {
 }
 
 .welcome-icon::after {
-  content: "";
-  border-style: solid;
-  border-width: 16px 0 16px 26px;
-  border-color: transparent transparent transparent #fff;
-  margin-left: 6px;
+  content: none;
 }
 
 .welcome-title {
@@ -1052,7 +1266,7 @@ body {
   border: none;
   border-radius: var(--r-pill);
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(200, 103, 79, 0.4);
+  box-shadow: 0 8px 20px rgba(73, 72, 188, 0.3);
   transition: all 0.18s ease;
 }
 
@@ -1064,7 +1278,7 @@ body {
 .explain-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(46, 42, 36, 0.55);
+  background: rgba(18, 22, 62, 0.58);
   backdrop-filter: blur(3px);
   z-index: 9999;
   display: flex;
@@ -1131,6 +1345,26 @@ body {
   line-height: 1.5;
 }
 
+.explain-language-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.explain-language-caption {
+  color: var(--text-muted);
+  font: 600 11px/1.3 var(--font-body);
+  letter-spacing: 0.2px;
+}
+
+.explain-mode-control {
+  flex-shrink: 0;
+}
+
 .explain-modal-content {
   padding: 20px;
   overflow-y: auto;
@@ -1141,11 +1375,167 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 20px;
+  justify-content: center;
+  min-height: 170px;
+  padding: 8px 14px 14px;
   color: var(--text-muted);
   font-family: var(--font-body);
   font-size: 12.5px;
+}
+
+.explain-thinking-state {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.explain-thinking-stage {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  isolation: isolate;
+}
+
+.explain-thinking-stage::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  z-index: -1;
+  border: 1px solid rgba(109, 213, 255, 0.28);
+  border-radius: 25px;
+  background: radial-gradient(circle, rgba(128, 108, 255, 0.16), transparent 68%);
+  box-shadow:
+    0 0 0 6px rgba(91, 91, 214, 0.05),
+    0 13px 30px rgba(43, 47, 126, 0.2);
+  animation: explainThinkingGlow 2.4s ease-in-out infinite;
+}
+
+.explain-thinking-avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 24px;
+  background: url("icons/translatorx-thinking-192.png") center / cover no-repeat;
+  filter: drop-shadow(0 7px 14px rgba(42, 45, 118, 0.18));
+  animation: explainThinkingBob 2.2s ease-in-out infinite;
+}
+
+.explain-thinking-bubble {
+  position: absolute;
+  z-index: 2;
+  display: block;
+  border: 1px solid rgba(218, 231, 255, 0.9);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #8f76ff, #6dd5ff);
+  box-shadow: 0 0 12px rgba(109, 213, 255, 0.62);
+  opacity: 0;
+}
+
+.explain-thinking-bubble--one {
+  top: 3px;
+  right: -1px;
+  width: 9px;
+  height: 9px;
+  animation: explainThoughtBubble 2.4s ease-in-out infinite 0.25s;
+}
+
+.explain-thinking-bubble--two {
+  top: 18px;
+  right: -6px;
+  width: 6px;
+  height: 6px;
+  animation: explainThoughtBubble 2.4s ease-in-out infinite 0.75s;
+}
+
+.explain-thinking-text {
+  min-height: 21px;
+  max-width: 290px;
+  color: #6964a9;
+  font: 650 13px/1.6 var(--font-reading);
+  letter-spacing: 0.01em;
+}
+
+.explain-thinking-text.is-refreshing {
+  animation: explainWaitingSwap 0.38s ease both;
+}
+
+.explain-thinking-progress {
+  position: relative;
+  display: block;
+  width: min(180px, 72%);
+  height: 3px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: rgba(91, 91, 214, 0.1);
+}
+
+.explain-thinking-progress::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 -44%;
+  width: 44%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--accent-cyan), var(--accent-bright), transparent);
+  animation: explainThinkingProgress 1.6s ease-in-out infinite;
+}
+
+@keyframes explainThinkingBob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(1.3deg);
+  }
+}
+
+@keyframes explainThinkingGlow {
+  0%,
+  100% {
+    opacity: 0.62;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes explainThoughtBubble {
+  0%,
+  22% {
+    opacity: 0;
+    transform: translateY(5px) scale(0.6);
+  }
+  48%,
+  72% {
+    opacity: 0.92;
+    transform: translateY(-2px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.78);
+  }
+}
+
+@keyframes explainWaitingSwap {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes explainThinkingProgress {
+  to {
+    left: 100%;
+  }
 }
 
 .explain-text {
@@ -1156,7 +1546,29 @@ body {
 }
 
 .explain-text p {
-  margin-bottom: 12px;
+  margin: 0;
+}
+
+.explain-text p + p {
+  margin-top: 12px;
+}
+
+.explain-text-bilingual {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.explain-language-block + .explain-language-block {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.explain-language-label {
+  margin-bottom: 7px;
+  color: var(--accent);
+  font: 700 10px/1.2 var(--font-body);
+  letter-spacing: 0.5px;
 }
 
 .explain-error {
@@ -1173,12 +1585,29 @@ body {
    ============================================================ */
 
 /* Segmented filter control (This Video / All Notes) */
+.notes-section-header {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notes-header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .notes-filter {
   display: flex;
   gap: 3px;
   padding: 3px;
   background: var(--surface-raised);
   border-radius: var(--r-pill);
+}
+
+.notes-section-header .notes-filter {
+  align-self: flex-end;
 }
 
 .notes-filter .enhance-btn {
@@ -1202,7 +1631,7 @@ body {
 .notes-filter .enhance-btn.active {
   background: var(--accent);
   color: white;
-  box-shadow: 0 2px 6px rgba(200, 103, 79, 0.3);
+  box-shadow: 0 5px 12px rgba(73, 72, 188, 0.24);
 }
 
 .notes-filter .enhance-btn.active:hover:not(:disabled) {
@@ -1297,6 +1726,38 @@ body {
   margin-bottom: 12px;
 }
 
+.note-text.localized-bilingual .localized-translation {
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+@media (max-width: 390px) {
+  .overview-section-header,
+  .notes-header-main {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+.transcript-entry:focus-visible,
+.quote-item:focus-visible {
+  outline: 3px solid rgba(109, 213, 255, 0.42);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 .note-actions {
   display: flex;
   gap: 8px;
@@ -1319,4 +1780,176 @@ body {
   border-color: var(--accent);
   color: var(--accent);
   background: var(--accent-dim);
+}
+
+.note-reflection {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.note-reflection-toggle {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.note-reflection-toggle:focus-visible {
+  outline: 3px solid rgba(91, 91, 214, 0.24);
+  outline-offset: 4px;
+  border-radius: var(--r-sm);
+}
+
+.note-reflection-kicker {
+  margin-top: 1px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.note-reflection-preview {
+  min-width: 0;
+  font-family: var(--font-reading);
+  font-size: 13px;
+  line-height: 1.58;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.note-reflection-preview.is-empty {
+  color: var(--text-muted);
+}
+
+.note-reflection-chevron {
+  font-size: 15px;
+  line-height: 1.1;
+  color: var(--text-muted);
+  transition: transform 0.18s ease;
+}
+
+.note-item.reflection-open .note-reflection-chevron {
+  transform: rotate(180deg);
+}
+
+.note-reflection-editor {
+  margin-top: 11px;
+  padding: 12px 12px 11px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--accent-dim);
+}
+
+.note-reflection-editor[hidden] {
+  display: none;
+}
+
+.note-reflection-label {
+  display: block;
+  margin-bottom: 7px;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--text-secondary);
+}
+
+.note-reflection-input {
+  display: block;
+  width: 100%;
+  min-height: 92px;
+  padding: 10px 11px;
+  resize: vertical;
+  border: 1px solid var(--border-heavy);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--text);
+  font: 13.5px/1.6 var(--font-reading);
+}
+
+.note-reflection-input::placeholder {
+  color: var(--text-muted);
+}
+
+.note-reflection-input:focus {
+  border-color: var(--accent);
+  outline: 3px solid rgba(91, 91, 214, 0.14);
+}
+
+.note-reflection-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.note-reflection-status {
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--sage);
+}
+
+.note-reflection-status.is-error {
+  color: var(--accent-hover);
+}
+
+.note-reflection-cancel,
+.note-reflection-save {
+  border-radius: var(--r-pill);
+  padding: 6px 12px;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.note-reflection-cancel {
+  border: 1px solid var(--border-heavy);
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+.note-reflection-save {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.note-reflection-cancel:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.note-reflection-save:hover:not(:disabled) {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.note-reflection-cancel:focus-visible,
+.note-reflection-save:focus-visible {
+  outline: 3px solid rgba(91, 91, 214, 0.22);
+  outline-offset: 2px;
+}
+
+.note-reflection-save:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+@media (max-width: 390px) {
+  .note-reflection-toggle {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .note-reflection-chevron {
+    display: none;
+  }
 }

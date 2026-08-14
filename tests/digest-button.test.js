@@ -4,10 +4,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const contentScript = fs.readFileSync(
-  path.resolve(__dirname, "..", "content.js"),
-  "utf8",
-);
+const contentScript = ["ui-language.js", "content.js"]
+  .map((file) => fs.readFileSync(path.resolve(__dirname, "..", file), "utf8"))
+  .join("\n");
 
 class FakeElement {
   constructor({
@@ -96,7 +95,7 @@ class FakeElement {
   }
 }
 
-function createHarness() {
+function createHarness({ sendMessage = async () => ({ success: true }) } = {}) {
   const actionRows = [];
   const fallbackRows = [];
   const elements = [];
@@ -153,8 +152,8 @@ function createHarness() {
     chrome: {
       runtime: {
         onMessage: { addListener() {} },
-        async sendMessage() {
-          return { success: true };
+        async sendMessage(message) {
+          return sendMessage(message);
         },
       },
     },
@@ -331,4 +330,35 @@ test("DOM mutation reconciliation repairs a replaced toolbar", () => {
   assert.equal(oldGroup.children.length, 0);
   assert.equal(newRow.children.length, 1);
   assert.equal(newGroup.children.length, 1);
+});
+
+test("Digest button is exposed only after side panel preparation", async () => {
+  const messages = [];
+  const harness = createHarness({
+    async sendMessage(message) {
+      messages.push(message);
+      return { success: true };
+    },
+  });
+  const { row, buttonGroup } = createActionRow({
+    width: 500,
+    height: 36,
+  });
+  harness.actionRows.push(row);
+
+  await harness.documentListeners.DOMContentLoaded();
+  const digestButton = buttonGroup.children[0];
+  assert.equal(digestButton.id, "ytd-digest-button");
+  assert.deepEqual(JSON.parse(JSON.stringify(messages)), [
+    { action: "prepareSidePanel" },
+  ]);
+
+  await digestButton.listeners.click({
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(messages)), [
+    { action: "prepareSidePanel" },
+    { action: "openSidePanel" },
+  ]);
 });

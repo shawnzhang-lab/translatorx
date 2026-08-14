@@ -3,7 +3,7 @@
  *
  * This is the "brain" of the extension. It runs in the background and handles:
  * 1. Opening the side panel when the user clicks the extension icon
- * 2. Fetching YouTube transcripts via Supadata API
+ * 2. Reading YouTube captions directly, with optional Supadata fallback
  * 3. Calling DeepSeek to analyze the transcript
  * 4. Sending results back to the side panel
  *
@@ -28,12 +28,43 @@ const debugLog = (...args) => {
 chrome.storage.local
   .setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" })
   .catch((error) =>
-    console.warn("[YouTube Digest] Could not restrict storage access:", error),
+    console.warn("[TranslatorX] Could not restrict storage access:", error),
   );
 
 async function getSettings() {
   const stored = await chrome.storage.local.get(YTD_SETTINGS.STORAGE_KEY);
   return YTD_SETTINGS.normalize(stored[YTD_SETTINGS.STORAGE_KEY]);
+}
+
+function isMissingContentScriptError(error) {
+  const message = String(error?.message || error || "");
+  return (
+    message.includes("Receiving end does not exist") ||
+    message.includes("Could not establish connection")
+  );
+}
+
+/**
+ * Extension reloads invalidate content scripts that were already running in an
+ * open YouTube tab. Recover once by injecting the current content script, then
+ * replay the original message. content.js replaces stale page buttons during
+ * initialization, restoring both timestamp seeking and the player Note button.
+ */
+async function sendToContentWithRecovery(tabId, payload) {
+  try {
+    return await chrome.tabs.sendMessage(tabId, payload);
+  } catch (error) {
+    if (!isMissingContentScriptError(error)) throw error;
+    debugLog(
+      "[TranslatorX BG] Content script missing after extension reload; reinjecting",
+      tabId,
+    );
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["ui-language.js", "content.js"],
+    });
+    return chrome.tabs.sendMessage(tabId, payload);
+  }
 }
 
 const promptFileCache = new Map();
@@ -45,7 +76,9 @@ async function loadPromptSection(fileName, heading, variables = {}) {
     if (!response.ok) {
       throw new Error(`Could not load prompt file: ${fileName}`);
     }
-    markdown = await response.text();
+    // Chrome preserves the source file's line endings. Normalize Windows CRLF
+    // so prompt-section parsing behaves the same on every platform.
+    markdown = (await response.text()).replace(/\r\n?/g, "\n");
     promptFileCache.set(fileName, markdown);
   }
 
@@ -81,7 +114,7 @@ async function requestAiCompletion({
   const settings = await getSettings();
   if (!settings.aiApiKey) {
     const error = new Error(
-      "DeepSeek API key not configured. Open YouTube Digest Settings.",
+      "DeepSeek API key not configured. Open TranslatorX Settings.",
     );
     error.code = "NO_AI_KEY";
     throw error;
@@ -229,24 +262,46 @@ async function readBoundedAiResponse(response, onActivity) {
 // SIDE PANEL SETUP
 // ============================================================
 
+function requireSidePanelTabId(tabId) {
+  if (!Number.isInteger(tabId)) {
+    throw new Error("TranslatorX could not identify the active browser tab.");
+  }
+  return tabId;
+}
+
+function prepareSidePanelForTab(tabId) {
+  return chrome.sidePanel.setOptions({
+    tabId: requireSidePanelTabId(tabId),
+    path: "sidepanel.html",
+    enabled: true,
+  });
+}
+
+function openSidePanelForTab(tabId) {
+  return chrome.sidePanel.open({ tabId: requireSidePanelTabId(tabId) });
+}
+
 /**
  * When the user clicks the extension icon, open the side panel.
  * Chrome's Side Panel API lets us show a persistent panel alongside the page.
  */
 chrome.action.onClicked.addListener((tab) => {
-  // Re-enable + open without awaiting — preserves user gesture context
-  chrome.sidePanel.setOptions({
-    tabId: tab.id,
-    path: "sidepanel.html",
-    enabled: true,
-  });
-  chrome.sidePanel.open({ tabId: tab.id });
+  // The action click is itself a user gesture. Tab-specific options are
+  // prepared by tab lifecycle events and the content script before its page
+  // button becomes clickable, so this handler must only open the panel.
+  openSidePanelForTab(tab.id).catch((error) =>
+    console.error("[TranslatorX BG] Action side panel error:", error),
+  );
 });
 
 /**
  * Allow the side panel to open on any page, but it's designed for YouTube.
  */
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+Promise.resolve(
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }),
+).catch((error) =>
+  console.error("[TranslatorX BG] Side panel behavior error:", error),
+);
 
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === "install") chrome.runtime.openOptionsPage();
@@ -256,7 +311,7 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
  * Keep the side panel scoped to YouTube tabs only.
  *
  * Chrome side panels are "global" by default: once opened, the panel follows
- * you to every tab. To make YouTube Digest behave like a YouTube-only tool, we
+ * you to every tab. To make TranslatorX behave like a YouTube-only tool, we
  * enable the panel on YouTube tabs and disable it everywhere else. Disabling
  * on a tab makes Chrome hide/close the panel for that tab, so it never lingers
  * on a new tab or some other website.
@@ -302,7 +357,7 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // We need to return true to indicate we'll respond asynchronously
   if (message.action === "fetchTranscript") {
-    handleFetchTranscript(message.videoId)
+    handleFetchTranscript(message.videoId, message.tabId)
       .then(sendResponse)
       .catch((err) => sendResponse({ error: err.message }));
     return true; // Keep the message channel open for async response
@@ -355,6 +410,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.action === "saveNoteTranslations") {
+    handleSaveNoteTranslations(message.translations)
+      .then(sendResponse)
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  if (message.action === "updateNoteReflection") {
+    handleUpdateNoteReflection(message.noteId, message.reflection)
+      .then(sendResponse)
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
   if (message.action === "deleteNote") {
     // Delete a specific note
     handleDeleteNote(message.noteId)
@@ -401,61 +470,52 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  if (message.action === "prepareSidePanel") {
+    const tabId = sender.tab?.id;
+    prepareSidePanelForTab(tabId)
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => {
+        console.error("[TranslatorX BG] prepareSidePanel error:", error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true;
+  }
+
   if (message.action === "openSidePanel") {
     const tabId = sender.tab?.id;
-    debugLog("[YouTube Digest BG] openSidePanel requested from tab:", tabId);
+    debugLog("[TranslatorX BG] openSidePanel requested from tab:", tabId);
 
-    // Re-enable the panel (it may have been disabled by auto-close) and open it.
-    // IMPORTANT: we call setOptions + open synchronously (no await between them)
-    // to preserve the user gesture context. Chrome requires sidePanel.open()
-    // to be called within a user gesture — awaiting anything first can expire it.
-    if (tabId) {
-      chrome.sidePanel.setOptions({
-        tabId,
-        path: "sidepanel.html",
-        enabled: true,
-      });
-      chrome.sidePanel
-        .open({ tabId })
-        .then(() => {
-          // Broadcast to side panel to start digest (in case it's already open)
-          setTimeout(() => {
-            chrome.runtime
-              .sendMessage({ action: "startDigestFromButton" })
-              .catch(() => {});
-          }, 300);
-        })
-        .catch((err) => {
-          console.error("[YouTube Digest BG] openSidePanel error:", err);
-        });
-    } else {
-      // Fallback: find the active tab
-      chrome.tabs
-        .query({ active: true, lastFocusedWindow: true })
-        .then((tabs) => {
-          if (tabs[0]) {
-            chrome.sidePanel.setOptions({
-              tabId: tabs[0].id,
-              path: "sidepanel.html",
-              enabled: true,
-            });
-            chrome.sidePanel.open({ tabId: tabs[0].id }).catch((err) => {
-              console.error(
-                "[YouTube Digest BG] openSidePanel fallback error:",
-                err,
-              );
-            });
-          }
-        });
+    // Chrome requires open() to run directly in the propagated user gesture.
+    // Do not await setOptions here. The content script completes that setup
+    // before inserting the clickable button.
+    let opening;
+    try {
+      opening = openSidePanelForTab(tabId);
+    } catch (error) {
+      sendResponse({ success: false, error: error.message });
+      return false;
     }
 
-    sendResponse({ success: true });
-    return false;
+    opening
+      .then(() => {
+        sendResponse({ success: true });
+        // Broadcast to side panel to start digest (in case it's already open).
+        setTimeout(() => {
+          chrome.runtime
+            .sendMessage({ action: "startDigestFromButton" })
+            .catch(() => {});
+        }, 300);
+      })
+      .catch((error) => {
+        console.error("[TranslatorX BG] openSidePanel error:", error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true;
   }
 
   // Relay messages from side panel to content script
   if (message.action === "relayToContent") {
-    debugLog("[YouTube Digest BG] Relay request:", message.payload?.action);
+    debugLog("[TranslatorX BG] Relay request:", message.payload?.action);
     (async () => {
       try {
         // Query specifically for YouTube tabs to avoid side panel context issues
@@ -465,7 +525,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           lastFocusedWindow: true,
         });
         debugLog(
-          "[YouTube Digest BG] Active tab in last focused window:",
+          "[TranslatorX BG] Active tab in last focused window:",
           tabs.length,
           tabs[0]?.url,
         );
@@ -476,23 +536,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             url: "https://www.youtube.com/*",
             active: true,
           });
-          debugLog("[YouTube Digest BG] Active YouTube tabs:", tabs.length);
+          debugLog("[TranslatorX BG] Active YouTube tabs:", tabs.length);
         }
 
         // Still nothing? Try any YouTube tab
         if (!tabs[0]) {
           tabs = await chrome.tabs.query({ url: "https://www.youtube.com/*" });
-          debugLog("[YouTube Digest BG] Any YouTube tabs:", tabs.length);
+          debugLog("[TranslatorX BG] Any YouTube tabs:", tabs.length);
         }
 
         if (tabs[0]) {
           debugLog(
-            "[YouTube Digest BG] Sending to tab:",
+            "[TranslatorX BG] Sending to tab:",
             tabs[0].id,
             "URL:",
             tabs[0].url,
           );
-          let response = await chrome.tabs.sendMessage(
+          let response = await sendToContentWithRecovery(
             tabs[0].id,
             message.payload,
           );
@@ -519,14 +579,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
           }
 
-          debugLog("[YouTube Digest BG] Got response from content:", response);
+          debugLog("[TranslatorX BG] Got response from content:", response);
           sendResponse({ success: true, response });
         } else {
-          debugLog("[YouTube Digest BG] No YouTube tab found");
+          debugLog("[TranslatorX BG] No YouTube tab found");
           sendResponse({ success: false, error: "No YouTube tab found" });
         }
       } catch (err) {
-        console.error("[YouTube Digest BG] Relay error:", err.message);
+        console.error("[TranslatorX BG] Relay error:", err.message);
         sendResponse({ success: false, error: err.message });
       }
     })();
@@ -568,37 +628,312 @@ async function getPlayerVideoDetails(tabId) {
     });
     return results?.[0]?.result || null;
   } catch (e) {
-    console.warn("[YouTube Digest BG] Player details unavailable:", e.message);
+    console.warn("[TranslatorX BG] Player details unavailable:", e.message);
     return null;
   }
 }
 
 // ============================================================
-// TRANSCRIPT FETCHING VIA SUPADATA API
+// TRANSCRIPT FETCHING: YOUTUBE FIRST, OPTIONAL SUPADATA FALLBACK
 // ============================================================
 
 /**
- * Fetches the transcript for a YouTube video using Supadata API.
+ * Reads a native YouTube caption track from the open watch page. Supadata is
+ * contacted only when direct retrieval fails and the user configured a key.
  *
- * Supadata is a specialized service that reliably extracts transcripts
- * from YouTube videos. It handles all the complexity of parsing YouTube's
- * internal data structures, dealing with different caption formats, etc.
- *
- * API Docs: https://docs.supadata.ai
- *
- * @param {string} videoId - The YouTube video ID (e.g., "dQw4w9WgXcQ")
+ * @param {string} videoId - The YouTube video ID
+ * @param {number} preferredTabId - The tab that opened the side panel
  * @returns {Object} - { success, transcript, transcriptText, language } or { success: false, error }
  */
-async function handleFetchTranscript(videoId) {
+async function handleFetchTranscript(videoId, preferredTabId) {
   try {
+    const directResult = await fetchTranscriptDirectFromYouTube(
+      videoId,
+      preferredTabId,
+    );
+    if (directResult.success) return directResult;
+
+    console.warn(
+      "[TranslatorX] Direct caption retrieval unavailable; considering Supadata fallback:",
+      directResult.error,
+    );
+
     const settings = await getSettings();
     if (!settings.supadataApiKey) {
       return {
         success: false,
-        error: "NO_SUPADATA_KEY",
-        message: "Supadata API key not configured. Open YouTube Digest Settings.",
+        error:
+          directResult.error === "NO_TRANSCRIPT"
+            ? "NO_TRANSCRIPT"
+            : "DIRECT_TRANSCRIPT_UNAVAILABLE",
+        message:
+          directResult.message ||
+          "YouTube captions could not be read directly. Add an optional Supadata key in Settings to enable fallback retrieval.",
       };
     }
+
+    return await fetchTranscriptFromSupadata(videoId, settings.supadataApiKey);
+  } catch (error) {
+    console.error("Transcript fetch error:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to fetch transcript",
+    };
+  }
+}
+
+async function findYouTubeVideoTab(videoId, preferredTabId) {
+  const matchesVideo = (tab) => {
+    if (!tab?.url) return false;
+    try {
+      const url = new URL(tab.url);
+      return (
+        url.hostname === "www.youtube.com" &&
+        url.pathname === "/watch" &&
+        url.searchParams.get("v") === videoId
+      );
+    } catch (_error) {
+      return false;
+    }
+  };
+
+  if (Number.isInteger(preferredTabId)) {
+    try {
+      const preferred = await chrome.tabs.get(preferredTabId);
+      if (matchesVideo(preferred)) return preferred;
+    } catch (_error) {
+      // The originating tab may have been closed or navigated.
+    }
+  }
+
+  const tabs = await chrome.tabs.query({ url: "https://www.youtube.com/*" });
+  return tabs.find((tab) => tab.active && matchesVideo(tab)) || tabs.find(matchesVideo) || null;
+}
+
+/**
+ * Runs in YouTube's MAIN world. It reads the signed native caption URL from
+ * the current player's response and downloads the selected track from
+ * YouTube itself. Keep this function self-contained: executeScript serializes
+ * it without the service worker's surrounding scope.
+ */
+async function fetchYouTubeCaptionsInPage(expectedVideoId) {
+  try {
+    const player = document.getElementById("movie_player");
+    const playerResponse =
+      player?.getPlayerResponse?.() || globalThis.ytInitialPlayerResponse;
+    const activeVideoId =
+      playerResponse?.videoDetails?.videoId ||
+      new URL(globalThis.location.href).searchParams.get("v");
+
+    if (!playerResponse || activeVideoId !== expectedVideoId) {
+      return {
+        success: false,
+        error: "PLAYER_NOT_READY",
+        message: "The YouTube player is not ready yet. Refresh the video page and try again.",
+      };
+    }
+
+    const tracks =
+      playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+    if (!Array.isArray(tracks) || tracks.length === 0) {
+      return {
+        success: false,
+        error: "NO_TRANSCRIPT",
+        message: "This video does not expose a manual or automatic subtitle track.",
+      };
+    }
+
+    const rankedTracks = tracks
+      .filter((track) => typeof track?.baseUrl === "string" && track.baseUrl)
+      .map((track, index) => {
+        const language = String(track.languageCode || "").toLowerCase();
+        const isEnglish = language === "en" || language.startsWith("en-");
+        const isAutomatic = track.kind === "asr";
+        return {
+          track,
+          index,
+          rank: isEnglish ? (isAutomatic ? 1 : 0) : isAutomatic ? 3 : 2,
+        };
+      })
+      .sort((a, b) => a.rank - b.rank || a.index - b.index);
+    const selectedTrack = rankedTracks[0]?.track;
+    if (!selectedTrack) {
+      return {
+        success: false,
+        error: "NO_TRANSCRIPT",
+        message: "This video does not expose a usable subtitle track.",
+      };
+    }
+
+    const language = selectedTrack.languageCode || null;
+    const jsonUrl = new URL(selectedTrack.baseUrl);
+    jsonUrl.searchParams.set("fmt", "json3");
+    const jsonResponse = await fetch(jsonUrl.toString(), {
+      credentials: "include",
+    });
+    if (jsonResponse.ok) {
+      const jsonText = await jsonResponse.text();
+      try {
+        const payload = JSON.parse(jsonText);
+        const content = (payload.events || [])
+          .map((event) => ({
+            text: (event.segs || [])
+              .map((segment) => segment.utf8 || "")
+              .join("")
+              .replace(/\s*\n\s*/g, " ")
+              .trim(),
+            offset: Number(event.tStartMs) || 0,
+            duration: Number(event.dDurationMs) || 0,
+            lang: language,
+          }))
+          .filter((chunk) => chunk.text);
+        if (content.length) {
+          return { success: true, content, lang: language };
+        }
+      } catch (_error) {
+        // Some tracks ignore fmt=json3. Retry the signed URL as XML below.
+      }
+    }
+
+    const xmlResponse = await fetch(selectedTrack.baseUrl, {
+      credentials: "include",
+    });
+    if (!xmlResponse.ok) {
+      return {
+        success: false,
+        error: "CAPTION_FETCH_FAILED",
+        message: `YouTube returned ${xmlResponse.status} while loading captions.`,
+      };
+    }
+    const xml = new DOMParser().parseFromString(
+      await xmlResponse.text(),
+      "text/xml",
+    );
+    const content = Array.from(xml.querySelectorAll("text, p"))
+      .map((node) => {
+        const usesMilliseconds = node.tagName.toLowerCase() === "p";
+        const rawOffset = Number(
+          node.getAttribute(usesMilliseconds ? "t" : "start"),
+        );
+        const rawDuration = Number(
+          node.getAttribute(usesMilliseconds ? "d" : "dur"),
+        );
+        return {
+          text: String(node.textContent || "")
+            .replace(/\s*\n\s*/g, " ")
+            .trim(),
+          offset: usesMilliseconds ? rawOffset || 0 : (rawOffset || 0) * 1000,
+          duration: usesMilliseconds
+            ? rawDuration || 0
+            : (rawDuration || 0) * 1000,
+          lang: language,
+        };
+      })
+      .filter((chunk) => chunk.text);
+
+    if (!content.length) {
+      return {
+        success: false,
+        error: "EMPTY_TRANSCRIPT",
+        message: "YouTube returned an empty subtitle track.",
+      };
+    }
+    return { success: true, content, lang: language };
+  } catch (error) {
+    return {
+      success: false,
+      error: "DIRECT_TRANSCRIPT_FAILED",
+      message: error?.message || "YouTube captions could not be read directly.",
+    };
+  }
+}
+
+async function fetchTranscriptDirectFromYouTube(videoId, preferredTabId) {
+  const tab = await findYouTubeVideoTab(videoId, preferredTabId);
+  if (!tab?.id) {
+    return {
+      success: false,
+      error: "YOUTUBE_TAB_NOT_FOUND",
+      message: "Keep the matching YouTube video tab open and try again.",
+    };
+  }
+
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      world: "MAIN",
+      func: fetchYouTubeCaptionsInPage,
+      args: [videoId],
+    });
+    const pageResult = results?.[0]?.result;
+    if (!pageResult?.success) {
+      return (
+        pageResult || {
+          success: false,
+          error: "DIRECT_TRANSCRIPT_FAILED",
+          message: "YouTube did not return a caption result.",
+        }
+      );
+    }
+    return buildTranscriptResult(pageResult.content, pageResult.lang, "youtube");
+  } catch (error) {
+    return {
+      success: false,
+      error: "DIRECT_TRANSCRIPT_FAILED",
+      message: error.message || "YouTube captions could not be read directly.",
+    };
+  }
+}
+
+function buildTranscriptResult(content, language, source) {
+  const transcript = [];
+  let transcriptTextPlain = "";
+  let transcriptTextTimestamped = "";
+
+  for (const chunk of Array.isArray(content) ? content : []) {
+    if (!chunk?.text) continue;
+    const cleanText = String(chunk.text).replace(/>> ?/g, "").trim();
+    if (!cleanText) continue;
+
+    const startSeconds = Math.floor((Number(chunk.offset) || 0) / 1000);
+    const minutes = Math.floor(startSeconds / 60);
+    const seconds = startSeconds % 60;
+    const timestamp = `${minutes}:${String(seconds).padStart(2, "0")}`;
+    const chunkLanguage = chunk.lang || language || null;
+
+    transcript.push({
+      text: cleanText,
+      start: startSeconds,
+      duration: Math.floor((Number(chunk.duration) || 0) / 1000),
+      language: chunkLanguage,
+    });
+    transcriptTextPlain += cleanText + " ";
+    transcriptTextTimestamped += `[${timestamp}] ${cleanText}\n`;
+  }
+
+  if (!transcript.length) {
+    return {
+      success: false,
+      error: "EMPTY_TRANSCRIPT",
+      message: `${source === "supadata" ? "Supadata" : "YouTube"} returned an empty transcript for this video.`,
+    };
+  }
+
+  return {
+    success: true,
+    transcript,
+    transcriptText: transcriptTextPlain.trim(),
+    transcriptTextTimestamped: transcriptTextTimestamped.trim(),
+    language: typeof language === "string" ? language : transcript[0].language,
+    source,
+  };
+}
+
+/**
+ * Supadata caption-only fallback. This never requests AI transcription.
+ */
+async function fetchTranscriptFromSupadata(videoId, supadataApiKey) {
+  try {
 
     // Share only the canonical watch URL. This strips playlist, referral,
     // timestamp, and other browsing parameters from the active tab URL.
@@ -615,7 +950,7 @@ async function handleFetchTranscript(videoId) {
     const response = await fetch(apiUrl.toString(), {
       method: "GET",
       headers: {
-        "x-api-key": settings.supadataApiKey,
+        "x-api-key": supadataApiKey,
       },
     });
 
@@ -623,7 +958,7 @@ async function handleFetchTranscript(videoId) {
     if (response.status === 202) {
       const jobData = await response.json();
       // Poll for the result
-      return await pollTranscriptJob(jobData.jobId, settings.supadataApiKey);
+      return await pollTranscriptJob(jobData.jobId, supadataApiKey);
     }
 
     if (response.status === 206) {
@@ -640,7 +975,7 @@ async function handleFetchTranscript(videoId) {
         return {
           success: false,
           error: "INVALID_SUPADATA_KEY",
-          message: "Your Supadata API key is invalid. Open YouTube Digest Settings.",
+          message: "Your Supadata API key is invalid. Open TranslatorX Settings.",
         };
       }
       if (response.status === 404) {
@@ -665,60 +1000,10 @@ async function handleFetchTranscript(videoId) {
 
     const data = await response.json();
 
-    // Parse the response into our internal format
-    // Supadata returns: { content: [{ text, offset, duration, lang }], lang, availableLangs }
-    const transcript = [];
-    let transcriptTextPlain = ""; // Plain text for display/export
-    let transcriptTextTimestamped = ""; // Timestamped text for AI analysis
-
-    if (data.content && Array.isArray(data.content)) {
-      for (const chunk of data.content) {
-        if (chunk.text) {
-          // Clean up caption artifacts:
-          // ">>" = speaker change marker from YouTube auto-captions
-          const cleanText = chunk.text.replace(/>> ?/g, "").trim();
-          if (!cleanText) continue; // Skip if nothing left after cleanup
-
-          // offset is in milliseconds, convert to seconds
-          const startSeconds = Math.floor((chunk.offset || 0) / 1000);
-          const minutes = Math.floor(startSeconds / 60);
-          const seconds = startSeconds % 60;
-          const timestamp = `${minutes}:${String(seconds).padStart(2, "0")}`;
-
-          transcript.push({
-            text: cleanText,
-            start: startSeconds,
-            duration: Math.floor((chunk.duration || 0) / 1000),
-            language: chunk.lang || data.lang || null,
-          });
-
-          // Plain text without timestamps (for display/export)
-          transcriptTextPlain += cleanText + " ";
-
-          // Timestamped text for DeepSeek (format: [MM:SS] text)
-          // This allows the model to reference actual transcript positions.
-          transcriptTextTimestamped += `[${timestamp}] ${cleanText}\n`;
-        }
-      }
-    }
-
-    if (transcript.length === 0) {
-      return {
-        success: false,
-        error: "EMPTY_TRANSCRIPT",
-        message: "Supadata returned an empty transcript for this video.",
-      };
-    }
-
-    return {
-      success: true,
-      transcript: transcript,
-      transcriptText: transcriptTextPlain.trim(), // For display
-      transcriptTextTimestamped: transcriptTextTimestamped.trim(), // For AI
-      language: typeof data.lang === "string" ? data.lang : null,
-    };
+    // Supadata returns: { content: [{ text, offset, duration, lang }], lang }
+    return buildTranscriptResult(data.content, data.lang, "supadata");
   } catch (error) {
-    console.error("Transcript fetch error:", error);
+    console.error("Supadata fallback error:", error);
     return {
       success: false,
       error: error.message || "Failed to fetch transcript",
@@ -755,42 +1040,7 @@ async function pollTranscriptJob(jobId, supadataApiKey) {
     const data = await response.json();
 
     if (data.status === "completed") {
-      // Parse the completed transcript
-      const transcript = [];
-      let transcriptTextPlain = "";
-      let transcriptTextTimestamped = "";
-
-      if (data.content && Array.isArray(data.content)) {
-        for (const chunk of data.content) {
-          if (chunk.text) {
-            // Clean up caption artifacts (">>" = speaker change marker)
-            const cleanText = chunk.text.replace(/>> ?/g, "").trim();
-            if (!cleanText) continue;
-
-            const startSeconds = Math.floor((chunk.offset || 0) / 1000);
-            const minutes = Math.floor(startSeconds / 60);
-            const seconds = startSeconds % 60;
-            const timestamp = `${minutes}:${String(seconds).padStart(2, "0")}`;
-
-            transcript.push({
-              text: cleanText,
-              start: startSeconds,
-              duration: Math.floor((chunk.duration || 0) / 1000),
-              language: chunk.lang || data.lang || null,
-            });
-            transcriptTextPlain += cleanText + " ";
-            transcriptTextTimestamped += `[${timestamp}] ${chunk.text}\n`;
-          }
-        }
-      }
-
-      return {
-        success: true,
-        transcript: transcript,
-        transcriptText: transcriptTextPlain.trim(),
-        transcriptTextTimestamped: transcriptTextTimestamped.trim(),
-        language: typeof data.lang === "string" ? data.lang : null,
-      };
+      return buildTranscriptResult(data.content, data.lang, "supadata");
     }
 
     if (data.status === "failed") {
@@ -871,7 +1121,7 @@ async function handleAnalyzeTranscript(
       return {
         success: false,
         error: "NO_AI_KEY",
-        message: "DeepSeek API key not configured. Open YouTube Digest Settings.",
+        message: "DeepSeek API key not configured. Open TranslatorX Settings.",
       };
     }
 
@@ -925,7 +1175,7 @@ async function handleAnalyzeTranscript(
       promptVariables,
     );
 
-    debugLog("[YouTube Digest] Requesting video analysis", settings.aiModel);
+    debugLog("[TranslatorX] Requesting video analysis", settings.aiModel);
     const { text: responseText } = await requestAiCompletion({
       maxTokens: 8192,
       responseFormat: { type: "json_object" },
@@ -1053,7 +1303,7 @@ function validateAndFixTimestamps(analysis, maxSeconds) {
  */
 async function handleGetVideoInfo(tabId) {
   try {
-    const response = await chrome.tabs.sendMessage(tabId, {
+    const response = await sendToContentWithRecovery(tabId, {
       action: "getVideoInfo",
     });
     return response;
@@ -1102,10 +1352,10 @@ async function handleSaveNote(
       const cached = await chrome.storage.local.get(`digest_${videoId}`);
       if (cached[`digest_${videoId}`]?.transcript) {
         transcript = cached[`digest_${videoId}`].transcript;
-        debugLog("[YouTube Digest] Using cached transcript for note");
+        debugLog("[TranslatorX] Using cached transcript for note");
       }
     } catch (e) {
-      debugLog("[YouTube Digest] No cached transcript, fetching...");
+      debugLog("[TranslatorX] No cached transcript, fetching...");
     }
 
     // If no cached transcript, fetch it
@@ -1226,7 +1476,7 @@ async function handleSaveNote(
 
     return { success: true, note };
   } catch (error) {
-    console.error("[YouTube Digest] Save note error:", error);
+    console.error("[TranslatorX] Save note error:", error);
     return { success: false, error: error.message };
   }
 }
@@ -1249,7 +1499,7 @@ async function cleanupNoteText(
   }
 
   try {
-    debugLog("[YouTube Digest] Requesting note cleanup");
+    debugLog("[TranslatorX] Requesting note cleanup");
     const variables = {
       videoTitle: videoTitle || "Unknown",
       fullContext,
@@ -1286,7 +1536,7 @@ async function cleanupNoteText(
       }
     } catch (parseError) {
       console.warn(
-        "[YouTube Digest] JSON parse failed for note, stripping preambles:",
+        "[TranslatorX] JSON parse failed for note, stripping preambles:",
         parseError,
       );
       result = result.replace(
@@ -1304,7 +1554,7 @@ async function cleanupNoteText(
 
     return result.slice(0, 3000);
   } catch (e) {
-    console.error("[YouTube Digest] Cleanup error:", e);
+    console.error("[TranslatorX] Cleanup error:", e);
   }
 
   // Return combined raw text if cleanup fails
@@ -1346,6 +1596,88 @@ async function handleGetNotes(videoId) {
 }
 
 /**
+ * Persists translated note text so switching language modes does not spend
+ * tokens again. Only the supported Simplified Chinese field is accepted.
+ */
+async function handleSaveNoteTranslations(translations) {
+  try {
+    if (!Array.isArray(translations) || translations.length < 1 || translations.length > 4) {
+      return { success: false, error: "Note translation batch is invalid" };
+    }
+
+    const translatedById = new Map();
+    for (const item of translations) {
+      const noteId = typeof item?.noteId === "string" ? item.noteId.trim() : "";
+      const text = typeof item?.text === "string" ? item.text.trim() : "";
+      if (!/^note_[A-Za-z0-9_-]{1,128}$/.test(noteId) || !text || text.length > 3000) {
+        return { success: false, error: "Note translation is invalid" };
+      }
+      translatedById.set(noteId, text);
+    }
+
+    const result = await chrome.storage.local.get("ytd_notes");
+    const notes = Array.isArray(result.ytd_notes) ? result.ytd_notes : [];
+    let updated = 0;
+    const nextNotes = notes.map((note) => {
+      const translated = translatedById.get(note?.id);
+      if (!translated) return note;
+      updated += 1;
+      return {
+        ...note,
+        translations: {
+          ...(note.translations && typeof note.translations === "object"
+            ? note.translations
+            : {}),
+          zh: translated,
+        },
+      };
+    });
+
+    await chrome.storage.local.set({ ytd_notes: nextNotes });
+    return { success: true, updated };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Stores the user's own reflection with a captured note. Reflections are local
+ * text only and never leave the browser for AI processing.
+ */
+async function handleUpdateNoteReflection(noteId, reflection) {
+  try {
+    const normalizedNoteId = typeof noteId === "string" ? noteId.trim() : "";
+    const normalizedReflection =
+      typeof reflection === "string" ? reflection.trim() : "";
+    if (!/^note_[A-Za-z0-9_-]{1,128}$/.test(normalizedNoteId)) {
+      return { success: false, error: "Note ID is invalid" };
+    }
+    if (normalizedReflection.length > 3000) {
+      return { success: false, error: "Reflection is too long" };
+    }
+
+    const result = await chrome.storage.local.get("ytd_notes");
+    const notes = Array.isArray(result.ytd_notes) ? result.ytd_notes : [];
+    let updated = false;
+    const nextNotes = notes.map((note) => {
+      if (note?.id !== normalizedNoteId) return note;
+      updated = true;
+      return {
+        ...note,
+        reflection: normalizedReflection,
+        reflectionUpdatedAt: new Date().toISOString(),
+      };
+    });
+
+    if (!updated) return { success: false, error: "Note was not found" };
+    await chrome.storage.local.set({ ytd_notes: nextNotes });
+    return { success: true, reflection: normalizedReflection };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Deletes a note by ID
  */
 async function handleDeleteNote(noteId) {
@@ -1358,6 +1690,20 @@ async function handleDeleteNote(noteId) {
   } catch (error) {
     return { success: false, error: error.message };
   }
+}
+
+function normalizeBilingualExplanation(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("Explain returned an invalid bilingual response.");
+  }
+  const explanation =
+    typeof payload.en === "string" ? payload.en.trim() : "";
+  const explanationZh =
+    typeof payload.zh === "string" ? payload.zh.trim() : "";
+  if (!explanation || !explanationZh) {
+    throw new Error("Explain returned incomplete bilingual content.");
+  }
+  return { explanation, explanationZh };
 }
 
 async function handleExplainSelection(
@@ -1391,18 +1737,24 @@ async function handleExplainSelection(
       variables,
     );
 
-    debugLog("[YouTube Digest] Requesting selection explanation");
-    const { text: explanation } = await requestAiCompletion({
-      maxTokens: 1024,
+    debugLog("[TranslatorX] Requesting selection explanation");
+    const { text: responseText } = await requestAiCompletion({
+      temperature: 0.2,
+      maxTokens: 1536,
+      responseFormat: { type: "json_object" },
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
     });
+    const { explanation, explanationZh } = normalizeBilingualExplanation(
+      parseLooseJson(responseText),
+    );
 
     return {
       success: true,
-      explanation: explanation.trim(),
+      explanation,
+      explanationZh,
     };
   } catch (error) {
     console.error("Explain selection error:", error);
@@ -1511,8 +1863,8 @@ function normalizeTranslatedSegmentBatch(parsed, sourceSegments) {
 
 /**
  * Translates content using DeepSeek.
- * @param {Object} content - JSON object containing semantic transcript segments
- * @param {string} contentType - Must be 'transcriptBatch'
+ * @param {Object} content - JSON object containing stable text segments
+ * @param {string} contentType - 'transcriptBatch' or 'uiTextBatch'
  * @param {string} targetLanguage - 'zh' for Simplified Chinese
  * @param {string} videoTitle - The video title (for context)
  * @returns {Object} - { success, translatedContent } or { success: false, error }
@@ -1530,7 +1882,7 @@ async function handleTranslateContent(
         error: `Unsupported translation target: ${String(targetLanguage)}`,
       };
     }
-    if (contentType !== "transcriptBatch") {
+    if (!["transcriptBatch", "uiTextBatch"].includes(contentType)) {
       return {
         success: false,
         error: `Unsupported translation content type: ${String(contentType)}`,
@@ -1545,9 +1897,13 @@ async function handleTranslateContent(
     const sourceSegments = validateTranscriptBatchRequest(content);
     const langName = "Simplified Chinese";
     const baseRules = await getTranslationBaseRules(targetLanguage);
+    const promptSection =
+      contentType === "transcriptBatch"
+        ? "Transcript batch translation"
+        : "Overview and notes translation";
     const systemPrompt = await loadPromptSection(
       "translation.md",
-      "Transcript batch translation",
+      promptSection,
       {
         langName,
         videoTitle: videoTitle || "Unknown",
@@ -1557,7 +1913,7 @@ async function handleTranslateContent(
     const userContent = JSON.stringify({ segments: sourceSegments });
     const translationOptions = {
       temperature: 0.2,
-      maxTokens: 1536,
+      maxTokens: contentType === "transcriptBatch" ? 1536 : 4096,
       responseFormat: { type: "json_object" },
     };
     let result = await callAiTranslation(
@@ -1586,7 +1942,7 @@ async function handleTranslateContent(
     }
     return { success: true, translatedContent: aligned };
   } catch (error) {
-    console.error("[YouTube Digest] Translation error:", error);
+    console.error("[TranslatorX] Translation error:", error);
     return { success: false, error: error.message || "Translation failed" };
   }
 }
@@ -1630,9 +1986,24 @@ async function callAiTranslation(
 
 // Pure validators are exposed for the repository's Node tests only.
 globalThis.__YTD_TRANSLATION_TESTING__ = {
+  loadPromptSection,
   requestAiCompletion,
   callAiTranslation,
+  isMissingContentScriptError,
+  sendToContentWithRecovery,
+  prepareSidePanelForTab,
+  openSidePanelForTab,
+  normalizeBilingualExplanation,
   validateTranscriptBatchRequest,
   normalizeTranslatedSegmentBatch,
   handleTranslateContent,
+  handleSaveNoteTranslations,
+  handleUpdateNoteReflection,
+};
+
+globalThis.__YTD_TRANSCRIPT_TESTING__ = {
+  buildTranscriptResult,
+  fetchTranscriptDirectFromYouTube,
+  fetchTranscriptFromSupadata,
+  handleFetchTranscript,
 };

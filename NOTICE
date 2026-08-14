@@ -1,0 +1,16 @@
+TranslatorX
+
+TranslatorX is an independent derivative of YouTube Digest by Zara Zhang:
+https://github.com/zarazhangrui/youtube-digest
+
+The original project is used under the MIT License. Its original copyright
+notice and license text are preserved in LICENSE and must remain included in
+copies or substantial portions of this software.
+
+TranslatorX-specific modifications are maintained through:
+https://github.com/shawnzhang-lab
+
+Major modifications include the TranslatorX product identity, DeepSeek V4
+Flash integration, bilingual transcript and overview experiences, progressive
+translation, selected-text explanations, timestamped notes and reflections,
+playback-following behavior, local privacy controls, and release safeguards.

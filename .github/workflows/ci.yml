@@ -27,4 +27,4 @@ jobs:
         run: npm run package
 
       - name: Show packaged files
-        run: unzip -Z1 dist/youtube-digest-v*.zip
+        run: unzip -Z1 dist/translatorx-v*.zip

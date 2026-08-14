@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YouTube Digest</title>
+    <title>TranslatorX</title>
     <link rel="stylesheet" href="sidepanel.css" />
   </head>
   <body>
     <!-- HEADER -->
-    <!-- Note: the panel's own "YouTube Digest" title is shown by Chrome's side-panel
+    <!-- Note: the panel's own "TranslatorX" title is shown by Chrome's side-panel
          title bar, so we don't repeat a logo here. -->
     <div class="header">
       <div class="header-top">
@@ -21,18 +21,27 @@
           class="settings-btn"
           id="settingsBtn"
           type="button"
-          title="Open YouTube Digest settings"
-          aria-label="Open YouTube Digest settings"
+          data-ui-title-zh="打开 TranslatorX 设置"
+          data-ui-title-en="Open TranslatorX settings"
+          data-ui-aria-zh="打开 TranslatorX 设置"
+          data-ui-aria-en="Open TranslatorX settings"
         >
-          Settings
+          <span lang="zh-CN">设置</span><span lang="en">Settings</span>
         </button>
+        <button class="panel-language-toggle" id="uiLanguageToggle" type="button">English</button>
       </div>
 
       <!-- Tab navigation -->
       <div class="tabs" id="tabsNav" style="display: none">
-        <button class="tab active" data-tab="transcript">Transcript</button>
-        <button class="tab" data-tab="overview">Overview</button>
-        <button class="tab" data-tab="notes">Notes</button>
+        <button class="tab active" data-tab="transcript">
+          <span lang="zh-CN">字幕</span><span lang="en">Transcript</span>
+        </button>
+        <button class="tab" data-tab="overview">
+          <span lang="zh-CN">概览</span><span lang="en">Overview</span>
+        </button>
+        <button class="tab" data-tab="notes">
+          <span lang="zh-CN">笔记</span><span lang="en">Notes</span>
+        </button>
       </div>
     </div>
 
@@ -41,10 +50,10 @@
       <!-- WELCOME STATE -->
       <div id="welcomeState" class="welcome-container">
         <div class="welcome-icon">&#9655;</div>
-        <div class="welcome-title">Ready to Digest</div>
+        <div class="welcome-title"><span lang="zh-CN">准备翻译</span><span lang="en">Ready to Translate</span></div>
         <div class="welcome-desc">
-          Navigate to a YouTube video and click the extension icon to get an
-          AI-powered digest.
+          <span lang="zh-CN">打开一个 YouTube 视频，再点击扩展图标，即可获取双语字幕和 AI 内容概览。</span>
+          <span lang="en">Open a YouTube video and click the extension icon for bilingual subtitles and an AI-powered digest.</span>
         </div>
       </div>
 
@@ -52,9 +61,9 @@
       <div id="loadingState" style="display: none">
         <div class="loading-container">
           <div class="loading-bar"></div>
-          <div class="loading-text" id="loadingText">Fetching transcript</div>
+          <div class="loading-text" id="loadingText"><span lang="zh-CN">正在获取字幕</span><span lang="en">Fetching transcript</span></div>
           <div class="loading-subtext" id="loadingSubtext">
-            Extracting captions from video...
+            <span lang="zh-CN">正在从视频提取字幕…</span><span lang="en">Extracting captions from video...</span>
           </div>
         </div>
       </div>
@@ -63,11 +72,11 @@
       <div id="errorState" style="display: none">
         <div class="error-container">
           <div class="error-icon">&#9888;</div>
-          <div class="error-title" id="errorTitle">Error</div>
+          <div class="error-title" id="errorTitle"><span lang="zh-CN">错误</span><span lang="en">Error</span></div>
           <div class="error-message" id="errorMessage">
-            Something went wrong.
+            <span lang="zh-CN">出现了一些问题。</span><span lang="en">Something went wrong.</span>
           </div>
-          <button class="error-btn" id="errorBtn">Try Again</button>
+          <button class="error-btn" id="errorBtn"><span lang="zh-CN">重试</span><span lang="en">Try Again</span></button>
         </div>
       </div>
 
@@ -79,43 +88,43 @@
             <div class="section-header transcript-section-header">
               <div class="transcript-header-main">
                 <div class="section-title-wrap">
-                  <div class="section-title">Full Transcript</div>
+                  <div class="section-title"><span lang="zh-CN">完整字幕</span><span lang="en">Full Transcript</span></div>
                 </div>
                 <div
-                  class="transcript-mode-control"
+                  class="transcript-mode-control language-mode-control"
                   id="transcriptModeControl"
                   role="group"
-                  aria-label="Transcript language"
+                  aria-label="字幕语言 / Transcript language"
                 >
                   <button
-                    class="transcript-mode-btn active"
+                    class="transcript-mode-btn language-mode-btn"
                     type="button"
                     data-transcript-mode="original"
-                    aria-pressed="true"
-                  >Original</button>
+                    aria-pressed="false"
+                  ><span lang="zh-CN">原文</span><span lang="en">Original</span></button>
                   <button
-                    class="transcript-mode-btn"
+                    class="transcript-mode-btn language-mode-btn"
                     type="button"
                     data-transcript-mode="zh"
                     aria-pressed="false"
-                  >中文</button>
+                  ><span lang="zh-CN">中文</span><span lang="en">Chinese</span></button>
                   <button
-                    class="transcript-mode-btn"
+                    class="transcript-mode-btn language-mode-btn active"
                     type="button"
                     data-transcript-mode="bilingual"
-                    aria-pressed="false"
-                  >双语</button>
+                    aria-pressed="true"
+                  ><span lang="zh-CN">双语</span><span lang="en">Bilingual</span></button>
                   <span
                     class="translation-spinner"
                     id="langSpinner"
-                    aria-label="Translating"
+                    aria-label="正在翻译 / Translating"
                   ></span>
                 </div>
               </div>
               <div class="transcript-actions">
-                <button class="enhance-btn" id="copyTranscriptBtn">Copy</button>
+                <button class="enhance-btn" id="copyTranscriptBtn"><span lang="zh-CN">复制</span><span lang="en">Copy</span></button>
                 <button class="enhance-btn" id="exportTranscriptBtn">
-                  Export
+                  <span lang="zh-CN">导出</span><span lang="en">Export</span>
                 </button>
               </div>
             </div>
@@ -127,7 +136,39 @@
         <div class="tab-panel" data-panel="overview">
           <!-- Chapters -->
           <div class="section">
-            <div class="section-title">Chapters</div>
+            <div class="section-header overview-section-header">
+              <div class="section-title"><span lang="zh-CN">章节</span><span lang="en">Chapters</span></div>
+              <div
+                class="language-mode-control"
+                id="overviewModeControl"
+                role="group"
+                aria-label="概览语言 / Overview language"
+              >
+                <button
+                  class="language-mode-btn overview-mode-btn active"
+                  type="button"
+                  data-overview-mode="original"
+                  aria-pressed="true"
+                ><span lang="zh-CN">原文</span><span lang="en">Original</span></button>
+                <button
+                  class="language-mode-btn overview-mode-btn"
+                  type="button"
+                  data-overview-mode="zh"
+                  aria-pressed="false"
+                ><span lang="zh-CN">中文</span><span lang="en">Chinese</span></button>
+                <button
+                  class="language-mode-btn overview-mode-btn"
+                  type="button"
+                  data-overview-mode="bilingual"
+                  aria-pressed="false"
+                ><span lang="zh-CN">双语</span><span lang="en">Bilingual</span></button>
+                <span
+                  class="translation-spinner"
+                  id="overviewLangSpinner"
+                  aria-label="正在翻译概览 / Translating overview"
+                ></span>
+              </div>
+            </div>
             <ul class="chapter-list" id="chapterList">
               <li
                 class="chapter-item"
@@ -137,14 +178,14 @@
                   border-color: var(--border);
                 "
               >
-                Chapters will appear here
+                <span lang="zh-CN">章节会显示在这里</span><span lang="en">Chapters will appear here</span>
               </li>
             </ul>
           </div>
 
           <!-- Key Quotes -->
           <div class="section">
-            <div class="section-title">Key Quotes</div>
+            <div class="section-title"><span lang="zh-CN">重点引用</span><span lang="en">Key Quotes</span></div>
             <div id="quotesList">
               <div
                 class="quote-item"
@@ -155,7 +196,7 @@
                 "
               >
                 <div class="quote-text" style="font-style: normal">
-                  Quotes will be extracted when you view this tab...
+                  <span lang="zh-CN">打开本页后会提取重点引用…</span><span lang="en">Quotes will be extracted when you view this tab...</span>
                 </div>
               </div>
             </div>
@@ -165,29 +206,60 @@
         <!-- TAB: Notes -->
         <div class="tab-panel" data-panel="notes">
           <div class="section">
-            <div class="section-header">
-              <div class="section-title">Saved Notes</div>
+            <div class="section-header notes-section-header">
+              <div class="notes-header-main">
+                <div class="section-title"><span lang="zh-CN">已保存笔记</span><span lang="en">Saved Notes</span></div>
+                <div
+                  class="language-mode-control"
+                  id="notesModeControl"
+                  role="group"
+                  aria-label="笔记语言 / Notes language"
+                >
+                  <button
+                    class="language-mode-btn notes-mode-btn active"
+                    type="button"
+                    data-notes-mode="original"
+                    aria-pressed="true"
+                  ><span lang="zh-CN">原文</span><span lang="en">Original</span></button>
+                  <button
+                    class="language-mode-btn notes-mode-btn"
+                    type="button"
+                    data-notes-mode="zh"
+                    aria-pressed="false"
+                  ><span lang="zh-CN">中文</span><span lang="en">Chinese</span></button>
+                  <button
+                    class="language-mode-btn notes-mode-btn"
+                    type="button"
+                    data-notes-mode="bilingual"
+                    aria-pressed="false"
+                  ><span lang="zh-CN">双语</span><span lang="en">Bilingual</span></button>
+                  <span
+                    class="translation-spinner"
+                    id="notesLangSpinner"
+                    aria-label="正在翻译笔记 / Translating notes"
+                  ></span>
+                </div>
+              </div>
               <div class="notes-filter">
                 <button
                   class="enhance-btn active"
                   id="notesFilterThis"
                   aria-pressed="true"
                 >
-                  This Video
+                  <span lang="zh-CN">当前视频</span><span lang="en">This Video</span>
                 </button>
                 <button
                   class="enhance-btn"
                   id="notesFilterAll"
                   aria-pressed="false"
                 >
-                  All Notes
+                  <span lang="zh-CN">全部笔记</span><span lang="en">All Notes</span>
                 </button>
               </div>
             </div>
             <p class="notes-intro" id="notesIntro">
-              Move your mouse over the video and click the 📝 Note button to
-              save timestamped notes, or press the "n" key while the video is
-              focused.
+              <span lang="zh-CN">将鼠标移到视频上，点击 📝 笔记保存带时间戳的笔记；视频获得焦点时也可按 N 键。</span>
+              <span lang="en">Move over the video and click 📝 Note to save a timestamped note, or press N while the video is focused.</span>
             </p>
             <div id="notesList"></div>
           </div>
@@ -201,10 +273,11 @@
       id="followPlaybackBtn"
       style="display: none"
     >
-      Follow playback
+      <span lang="zh-CN">跟随当前字幕</span><span lang="en">Follow playback</span>
     </button>
 
     <script src="settings.js"></script>
+    <script src="ui-language.js"></script>
     <script src="sidepanel.js"></script>
   </body>
 </html>

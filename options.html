@@ -1,147 +1,198 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YouTube Digest Settings</title>
+    <title>TranslatorX 设置 / Settings</title>
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
     <main class="settings-shell">
-      <header>
-        <div class="eyebrow">YouTube Digest</div>
-        <h1>Bring your own API keys</h1>
-        <p class="lede">
-          Keys stay in this Chrome profile and are sent only to Supadata and
-          DeepSeek. This open-source extension has no developer server or
-          analytics.
-        </p>
+      <header class="page-header">
+        <button class="ui-language-toggle" id="uiLanguageToggle" type="button">English</button>
+        <div class="eyebrow"><span lang="zh-CN">TranslatorX 设置</span><span lang="en">TranslatorX Settings</span></div>
+        <h1 lang="zh-CN">使用你自己的 API Key</h1>
+        <p class="title-translation" lang="en">Bring your own API keys</p>
+        <div class="lede bilingual-copy">
+          <p lang="zh-CN">
+            Key 只保存在当前 Chrome 配置中。DeepSeek Key 用于 AI 功能；可选的
+            Supadata Key 仅在无法直接获取 YouTube 字幕时使用。本扩展没有开发者服务器，也不收集分析数据。
+          </p>
+          <p class="secondary-language" lang="en">
+            Keys stay in this Chrome profile. A DeepSeek key enables AI features;
+            an optional Supadata key is used only when direct YouTube subtitle
+            retrieval fails. This extension has no developer server or analytics.
+          </p>
+        </div>
       </header>
 
       <form id="settingsForm">
         <section class="card">
-          <h2>Transcript provider</h2>
-          <label for="supadataApiKey">Supadata API key</label>
+          <h2>
+            <span lang="zh-CN">字幕备用服务</span>
+            <span class="heading-translation" lang="en">Transcript fallback</span>
+          </h2>
+          <label class="bilingual-label" for="supadataApiKey">
+            <span lang="zh-CN">Supadata API Key（可选）</span>
+            <span class="label-translation" lang="en">Supadata API key (optional)</span>
+          </label>
           <input
             id="supadataApiKey"
             name="supadataApiKey"
             type="password"
             autocomplete="off"
             spellcheck="false"
-            placeholder="Paste your Supadata key"
+            placeholder="可选的备用 Key"
+            data-ui-placeholder-zh="可选的备用 Key"
+            data-ui-placeholder-en="Optional fallback key"
           />
-          <p class="help">
-            Used to fetch timestamped YouTube subtitles.
-            <a
-              href="https://dash.supadata.ai/auth/sign-up"
-              target="_blank"
-              rel="noreferrer"
-              >Create a Supadata account and key</a
-            >. Supadata generates the key during onboarding.
-          </p>
+          <div class="help bilingual-copy">
+            <p lang="zh-CN">
+              TranslatorX 会优先直接读取人工字幕和自动字幕。只有直接读取失败时，才会使用这个 Key。
+              <a href="https://dash.supadata.ai/auth/sign-up" target="_blank" rel="noreferrer"
+                >创建 Supadata 账号并获取 Key</a
+              >。Supadata 会在注册引导过程中生成 Key。
+            </p>
+            <p class="secondary-language" lang="en">
+              TranslatorX reads manual and automatic subtitles directly first.
+              This key is contacted only if direct retrieval fails.
+              <a href="https://dash.supadata.ai/auth/sign-up" target="_blank" rel="noreferrer"
+                >Create a Supadata account and key</a
+              >. Supadata generates the key during onboarding.
+            </p>
+          </div>
+          <nav
+            class="official-resources"
+            aria-label="Supadata 官方资源 / Official Supadata resources"
+          >
+            <a class="official-resource" href="https://supadata.ai/" target="_blank" rel="noreferrer">
+              <span class="official-resource-label"><span lang="zh-CN">官网</span><span lang="en">Official site</span></span>
+              <span class="official-resource-domain">supadata.ai ↗</span>
+            </a>
+            <a class="official-resource" href="https://dash.supadata.ai/auth/sign-up" target="_blank" rel="noreferrer">
+              <span class="official-resource-label"><span lang="zh-CN">获取 Key</span><span lang="en">Get API key</span></span>
+              <span class="official-resource-domain">dash.supadata.ai ↗</span>
+            </a>
+            <a class="official-resource" href="https://docs.supadata.ai/get-transcript" target="_blank" rel="noreferrer">
+              <span class="official-resource-label"><span lang="zh-CN">API 文档</span><span lang="en">API docs</span></span>
+              <span class="official-resource-domain">docs.supadata.ai ↗</span>
+            </a>
+          </nav>
         </section>
 
         <section class="card">
-          <h2>AI provider</h2>
-          <div class="provider-summary" aria-label="Supported AI provider">
+          <h2>
+            <span lang="zh-CN">AI 服务商</span>
+            <span class="heading-translation" lang="en">AI provider</span>
+          </h2>
+          <div class="provider-summary" aria-label="支持的 AI 服务商 / Supported AI provider">
             <span class="provider-name">DeepSeek V4 Flash</span>
-            <span class="provider-badge">Supported in this version</span>
+            <span class="provider-badge"><span lang="zh-CN">当前版本支持</span><span lang="en">Supported in this version</span></span>
           </div>
 
-          <label for="aiApiKey">DeepSeek API key</label>
+          <label class="bilingual-label" for="aiApiKey">
+            <span lang="zh-CN">DeepSeek API Key</span>
+            <span class="label-translation" lang="en">DeepSeek API key</span>
+          </label>
           <input
             id="aiApiKey"
             name="aiApiKey"
             type="password"
             autocomplete="off"
             spellcheck="false"
-            placeholder="Paste your DeepSeek key"
+            placeholder="粘贴你的 DeepSeek Key"
+            data-ui-placeholder-zh="粘贴你的 DeepSeek Key"
+            data-ui-placeholder-en="Paste your DeepSeek key"
           />
-          <p class="help">
-            YouTube Digest uses DeepSeek V4 Flash for overviews,
-            explanations, translation, and note polishing.
-            <a
-              href="https://platform.deepseek.com/api_keys"
-              target="_blank"
-              rel="noreferrer"
-              >Create a DeepSeek API key</a
-            >.
-          </p>
-          <div class="privacy-note">
-            When you use AI features, DeepSeek receives the video transcript
-            and relevant video context. Review DeepSeek's terms and pricing
-            before saving.
+          <div class="help bilingual-copy">
+            <p lang="zh-CN">
+              TranslatorX 使用 DeepSeek V4 Flash 生成内容概览、解释、翻译和笔记润色。
+              <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer"
+                >创建 DeepSeek API Key</a
+              >。
+            </p>
+            <p class="secondary-language" lang="en">
+              TranslatorX uses DeepSeek V4 Flash for overviews,
+              explanations, translation, and note polishing.
+              <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer"
+                >Create a DeepSeek API key</a
+              >.
+            </p>
+          </div>
+          <nav
+            class="official-resources"
+            aria-label="DeepSeek 官方资源 / Official DeepSeek resources"
+          >
+            <a class="official-resource" href="https://www.deepseek.com/" target="_blank" rel="noreferrer">
+              <span class="official-resource-label"><span lang="zh-CN">官网</span><span lang="en">Official site</span></span>
+              <span class="official-resource-domain">deepseek.com ↗</span>
+            </a>
+            <a class="official-resource" href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">
+              <span class="official-resource-label"><span lang="zh-CN">获取 Key</span><span lang="en">Get API key</span></span>
+              <span class="official-resource-domain">platform.deepseek.com ↗</span>
+            </a>
+            <a class="official-resource" href="https://api-docs.deepseek.com/" target="_blank" rel="noreferrer">
+              <span class="official-resource-label"><span lang="zh-CN">API 文档</span><span lang="en">API docs</span></span>
+              <span class="official-resource-domain">api-docs.deepseek.com ↗</span>
+            </a>
+          </nav>
+          <div class="privacy-note bilingual-copy">
+            <p lang="zh-CN">
+              使用 AI 功能时，DeepSeek 会接收视频字幕和相关视频上下文。保存设置前，请查看 DeepSeek 的条款与价格。
+            </p>
+            <p class="secondary-language" lang="en">
+              When you use AI features, DeepSeek receives the video transcript
+              and relevant video context. Review DeepSeek's terms and pricing
+              before saving.
+            </p>
           </div>
         </section>
 
         <div class="form-actions">
-          <button class="primary" type="submit">Save settings</button>
+          <button class="primary" type="submit">
+            <span lang="zh-CN">保存设置</span><span lang="en">Save settings</span>
+          </button>
           <span id="saveStatus" role="status" aria-live="polite"></span>
         </div>
       </form>
 
-      <details class="card customization-card">
-        <summary class="customization-summary">
-          <span class="customization-summary-copy">
-            <span class="eyebrow">Local remix</span>
-            <span class="customization-title"
-              >Want to use another AI model?</span
-            >
-            <span class="customization-purpose"
-              >Copy a safe prompt for your coding agent</span
-            >
-          </span>
-          <span class="agent-badge">Coding agent ready</span>
-        </summary>
-        <div class="customization-content">
-          <p class="help customization-copy">
-            This published version supports DeepSeek V4 Flash. You can adapt
-            your own local copy with a coding agent. Before copying, open the
-            exact YouTube Digest project folder that Chrome loaded through
-            Load unpacked in your coding agent. Then expand this section and
-            copy the prompt. For a first-time installation, optional permanent
-            locations include <code>~/Documents/youtube-digest</code> on macOS
-            or Linux, or
-            <code>%USERPROFILE%\Documents\youtube-digest</code> on Windows.
-            These are suggestions, not assumed paths. Chrome and the extension
-            cannot reliably reveal or copy the actual OS path. Never include
-            API keys in the prompt or chat. Enter them yourself only after the
-            code is ready.
-          </p>
-          <label for="customizationPrompt">Safe customization prompt</label>
-          <textarea id="customizationPrompt" readonly rows="12">Customize my local copy of YouTube Digest to use [PROVIDER] with [MODEL]. Work only in the currently open workspace. Before editing anything, verify that this workspace contains manifest.json and that its name is YouTube Digest. If verification fails, stop and tell me: "Open the exact YouTube Digest project folder that Chrome loaded through Load unpacked in your coding agent, then paste this prompt again." Do not search other folders or the whole disk, edit a guessed copy, assume an installation path, or claim that Chrome or the extension can reveal the absolute OS source path. Update the API endpoint, request format, and minimum Chrome host permissions needed for that provider. Preserve the bring-your-own-key model and local Chrome storage. Keep all API keys out of source code, commits, logs, screenshots, and this chat; after the code is ready, tell me where I should enter the key myself. Keep DeepSeek-specific fields and retries provider-scoped, update README.md, README.zh-CN.md, PRIVACY.md, SECURITY.md, and the tests, then run npm test, npm run check, and npm run package. Finally, explain how to reload the unpacked extension and test it on a real YouTube video.</textarea>
-          <div class="copy-actions">
-            <button id="copyCustomizationPromptBtn" type="button">
-              Copy customization prompt
-            </button>
-            <span id="copyStatus" role="status" aria-live="polite"></span>
-          </div>
-        </div>
-      </details>
-
       <section class="card data-card">
-        <h2>Local data</h2>
-        <p class="help">
-          Digests, translations, and notes are stored only in this Chrome
-          profile. You can remove them at any time.
-        </p>
+        <h2>
+          <span lang="zh-CN">本地数据</span>
+          <span class="heading-translation" lang="en">Local data</span>
+        </h2>
+        <div class="help bilingual-copy">
+          <p lang="zh-CN">内容摘要、翻译和笔记只保存在当前 Chrome 配置中，你可以随时删除。</p>
+          <p class="secondary-language" lang="en">
+            Digests, translations, and notes are stored only in this Chrome
+            profile. You can remove them at any time.
+          </p>
+        </div>
         <div class="data-actions">
-          <button id="clearCacheBtn" type="button">Clear cached digests</button>
-          <button id="clearNotesBtn" type="button">Delete all notes</button>
+          <button id="clearCacheBtn" type="button">
+            <span lang="zh-CN">清除摘要缓存</span><span lang="en">Clear cached digests</span>
+          </button>
+          <button id="clearNotesBtn" type="button">
+            <span lang="zh-CN">删除全部笔记</span><span lang="en">Delete all notes</span>
+          </button>
           <button id="resetBtn" class="danger" type="button">
-            Reset extension data
+            <span lang="zh-CN">重置扩展数据</span><span lang="en">Reset extension data</span>
           </button>
         </div>
         <span id="dataStatus" role="status" aria-live="polite"></span>
       </section>
 
-      <footer>
-        Read <a href="PRIVACY.md" target="_blank">PRIVACY.md</a> in the
-        repository for the complete data-flow description.
+      <footer class="bilingual-copy">
+        <p lang="zh-CN">完整的数据流说明请查看项目中的 <a href="PRIVACY.md" target="_blank">PRIVACY.md</a>。</p>
+        <p class="secondary-language" lang="en">
+          Read <a href="PRIVACY.md" target="_blank">PRIVACY.md</a> in the
+          repository for the complete data-flow description.
+        </p>
       </footer>
     </main>
 
     <script src="settings.js"></script>
+    <script src="ui-language.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

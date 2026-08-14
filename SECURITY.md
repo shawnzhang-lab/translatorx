@@ -2,13 +2,13 @@
 
 ## Supported versions
 
-YouTube Digest is a small GitHub-only project. Security fixes are made on the latest code on `main` and, when releases are published, the latest GitHub release. Older snapshots are not supported.
+TranslatorX is a small GitHub-only project. Security fixes are made on the latest code on `main` and, when releases are published, the latest GitHub release. Older snapshots are not supported.
 
 ## Report a vulnerability privately
 
 Do not publish vulnerability details, exposed credentials, private video information, or transcript data through a public issue or pull request. This repository does not accept public security reports.
 
-Use GitHub's private vulnerability reporting flow from this repository's **Security** tab when it is available. If the private reporting link is not visible, contact the repository owner through their GitHub profile and ask for a private reporting channel without including vulnerability details in the public message. Include the following only in the private report:
+Use GitHub's [private vulnerability reporting flow](https://github.com/shawnzhang-lab/translatorx/security/advisories/new) from this repository's **Security** tab when it is available. If the private reporting link is not visible, contact [the repository maintainer](https://github.com/shawnzhang-lab) through their GitHub profile and ask for a private reporting channel without including vulnerability details in the public message. Include the following only in the private report:
 
 - the affected version or commit;
 - the minimum steps needed to reproduce the problem;

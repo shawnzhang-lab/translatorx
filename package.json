@@ -1,12 +1,20 @@
 {
-  "name": "youtube-digest",
-  "version": "1.1.4",
+  "name": "translatorx",
+  "version": "1.5.13",
   "private": true,
-  "description": "Turn YouTube videos into learning resources with transcripts, bilingual translation, AI overviews, and notes.",
+  "description": "TranslatorX turns YouTube videos into bilingual transcripts, AI overviews, and timestamped notes.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shawnzhang-lab/translatorx.git"
+  },
+  "homepage": "https://github.com/shawnzhang-lab/translatorx#readme",
+  "bugs": {
+    "url": "https://github.com/shawnzhang-lab/translatorx/issues"
+  },
   "license": "MIT",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "bash scripts/check-release.sh",
-    "package": "bash scripts/package-extension.sh"
+    "check": "node scripts/run-bash.js scripts/check-release.sh",
+    "package": "node scripts/run-bash.js scripts/package-extension.sh"
   }
 }

@@ -30,6 +30,45 @@ let ytdDigestButton = null;
 let digestButtonObserver = null;
 let digestButtonReconcileTimer = null;
 let digestButtonResizeListenerAdded = false;
+let sidePanelPreparationPromise = null;
+let uiLanguage = TX_UI_LANGUAGE.DEFAULT_LANGUAGE;
+
+function ui(chinese, english) {
+  return TX_UI_LANGUAGE.pick(uiLanguage, chinese, english);
+}
+
+function noteButtonMarkup(label) {
+  return `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right: 7px;">
+      <path d="M12 20h9"></path>
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+    </svg>
+    <span>${label}</span>
+  `;
+}
+
+function applyInterfaceLanguage(language) {
+  uiLanguage = TX_UI_LANGUAGE.normalize(language);
+  if (ytdDigestButton) {
+    ytdDigestButton.setAttribute(
+      "aria-label",
+      ui("打开 TranslatorX", "Open TranslatorX"),
+    );
+  }
+  if (ytdNoteButton?.dataset.txState === "idle") {
+    ytdNoteButton.innerHTML = noteButtonMarkup(ui("笔记", "Note"));
+    ytdNoteButton.setAttribute(
+      "aria-label",
+      ui("保存当前时间点为笔记", "Save the current timestamp as a note"),
+    );
+  }
+}
+
+TX_UI_LANGUAGE.get().then(applyInterfaceLanguage);
+chrome.storage?.onChanged?.addListener((changes, areaName) => {
+  if (areaName !== "local" || !changes[TX_UI_LANGUAGE.STORAGE_KEY]) return;
+  applyInterfaceLanguage(changes[TX_UI_LANGUAGE.STORAGE_KEY].newValue);
+});
 
 // ============================================================
 // INITIALIZATION
@@ -39,11 +78,40 @@ let digestButtonResizeListenerAdded = false;
  * When the page loads, inject our Digest button and Note button.
  * We wait a bit for YouTube's UI to fully render.
  */
-function init() {
+async function prepareSidePanelForCurrentTab() {
+  if (!sidePanelPreparationPromise) {
+    sidePanelPreparationPromise = chrome.runtime
+      .sendMessage({ action: "prepareSidePanel" })
+      .then((result) => {
+        if (!result?.success) {
+          throw new Error(result?.error || "Could not prepare the side panel");
+        }
+        return true;
+      })
+      .catch((error) => {
+        sidePanelPreparationPromise = null;
+        console.error("[TranslatorX] Failed to prepare side panel:", error);
+        return false;
+      });
+  }
+  return sidePanelPreparationPromise;
+}
+
+async function init() {
   // Register the global "n" keyboard shortcut once
   if (!ytdNoteKeyboardListenerAdded) {
-    document.addEventListener("keydown", handleNoteKeyboardShortcut);
+    // Capture before YouTube's bubbling keyboard handler can consume plain N.
+    document.addEventListener("keydown", handleNoteKeyboardShortcut, true);
     ytdNoteKeyboardListenerAdded = true;
+  }
+
+  // Chrome requires tab-specific side panel options to be committed before
+  // the user gesture that opens it. Do not expose a clickable button until the
+  // background service worker confirms that preparation is complete.
+  const sidePanelReady = await prepareSidePanelForCurrentTab();
+  if (!sidePanelReady) {
+    setTimeout(init, 750);
+    return;
   }
 
   // Try to inject the buttons immediately
@@ -90,7 +158,7 @@ function tryInjectNoteButton() {
 
     if (attempts >= maxAttempts) {
       debugLog(
-        "[YouTube Digest Content] Player container not found after retries, giving up",
+        "[TranslatorX Content] Player container not found after retries, giving up",
       );
       if (ytdNoteButtonRetryTimer) {
         clearInterval(ytdNoteButtonRetryTimer);
@@ -122,12 +190,12 @@ if (document.readyState === "loading") {
  * When they send key moments, we highlight them on the progress bar.
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  debugLog("[YouTube Digest Content] Received message:", message.action, message);
+  debugLog("[TranslatorX Content] Received message:", message.action, message);
 
   if (message.action === "getVideoInfo") {
     // Read video title and channel name from the page
     const info = extractVideoInfo();
-    debugLog("[YouTube Digest Content] Returning video info:", info);
+    debugLog("[TranslatorX Content] Returning video info:", info);
     sendResponse(info);
     return false; // Synchronous response
   }
@@ -150,7 +218,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.action === "seekTo") {
     // Jump the video to a specific timestamp
-    debugLog("[YouTube Digest Content] Seeking to:", message.seconds);
+    debugLog("[TranslatorX Content] Seeking to:", message.seconds);
     seekToTimestamp(message.seconds);
     sendResponse({ success: true });
     return false;
@@ -163,8 +231,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  if (message.action === "saveCurrentNote") {
+    // The side panel is a separate document. When it owns keyboard focus it
+    // forwards the N shortcut here so the YouTube player timestamp is used.
+    saveCurrentNote()
+      .then(sendResponse)
+      .catch((error) =>
+        sendResponse({ success: false, error: error?.message || "Could not save note" }),
+      );
+    return true;
+  }
+
   // Unknown action - still send a response to prevent hanging
-  debugLog("[YouTube Digest Content] Unknown action:", message.action);
+  debugLog("[TranslatorX Content] Unknown action:", message.action);
   sendResponse({ success: false, error: "Unknown action" });
   return false;
 });
@@ -177,7 +256,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * Injects a "Digest" button into YouTube's action bar.
  * The button appears next to Share, Save, etc. below the video.
  *
- * When clicked, it opens the YouTube Digest side panel.
+ * When clicked, it opens the TranslatorX side panel.
  */
 function isVisibleDigestHost(element) {
   if (!element || !element.isConnected) return false;
@@ -229,33 +308,114 @@ function findDigestButtonHost() {
 
 function createDigestButton() {
   const digestButton = document.createElement("button");
+  const defaultAvatarUrl =
+    chrome.runtime.getURL?.("icons/translatorx-button-avatar-48.png") || "";
+  const successAvatarUrl =
+    chrome.runtime.getURL?.("icons/translatorx-success-ok-48.png") || "";
+  let isOpening = false;
+
   digestButton.id = "ytd-digest-button";
   digestButton.type = "button";
-  digestButton.setAttribute("aria-label", "Open YouTube Digest");
+  digestButton.setAttribute("aria-label", ui("打开 TranslatorX", "Open TranslatorX"));
+  digestButton.setAttribute("aria-live", "polite");
   digestButton.innerHTML = `
-    <span class="ytd-digest-icon" style="font-size: 11px;">▶</span>
-    <span class="ytd-digest-label">Digest</span>
+    <img class="ytd-digest-avatar" src="${defaultAvatarUrl}" alt="" draggable="false" aria-hidden="true">
+    <span class="ytd-digest-label">TranslatorX</span>
   `;
 
-  // Style the button — rounded pill in our terracotta accent, sized to sit
-  // comfortably among YouTube's native action buttons.
+  const styleDigestAvatar = () => {
+    const avatar = digestButton.querySelector?.(".ytd-digest-avatar");
+    if (!avatar) return;
+    avatar.style.cssText = `
+      display: block;
+      width: 28px;
+      height: 28px;
+      flex: 0 0 28px;
+      object-fit: cover;
+      border: 1px solid rgba(201, 220, 255, 0.72);
+      border-radius: 10px;
+      background: #171a52;
+      box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.1),
+        0 0 12px rgba(109, 213, 255, 0.28);
+      user-select: none;
+      pointer-events: none;
+    `;
+  };
+  styleDigestAvatar();
+
+  const restoreDigestIdleState = () => {
+    const avatar = digestButton.querySelector?.(".ytd-digest-avatar");
+    const label = digestButton.querySelector?.(".ytd-digest-label");
+    if (avatar && defaultAvatarUrl) avatar.src = defaultAvatarUrl;
+    if (label) label.textContent = "TranslatorX";
+    digestButton.setAttribute("aria-label", ui("打开 TranslatorX", "Open TranslatorX"));
+    digestButton.style.background =
+      "linear-gradient(135deg, #4d58cf 0%, #715cf1 62%, #5c79ee 100%)";
+    digestButton.style.borderColor = "rgba(127, 151, 255, 0.44)";
+    digestButton.style.boxShadow =
+      "0 7px 18px rgba(66, 65, 172, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.18)";
+    styleDigestAvatar();
+    isOpening = false;
+  };
+
+  const showDigestOpenSuccess = () => {
+    const avatar = digestButton.querySelector?.(".ytd-digest-avatar");
+    const label = digestButton.querySelector?.(".ytd-digest-label");
+    if (avatar && successAvatarUrl) avatar.src = successAvatarUrl;
+    if (label) label.textContent = ui("已打开", "Opened");
+    digestButton.setAttribute(
+      "aria-label",
+      ui("TranslatorX 已成功打开", "TranslatorX opened successfully"),
+    );
+    digestButton.style.background =
+      "linear-gradient(135deg, #4459d2 0%, #6c63f2 54%, #3da6c7 100%)";
+    digestButton.style.borderColor = "rgba(153, 232, 255, 0.82)";
+    digestButton.style.boxShadow =
+      "0 10px 28px rgba(68, 78, 192, 0.42), 0 0 0 4px rgba(109, 213, 255, 0.12)";
+
+    avatar?.animate?.(
+      [
+        { transform: "scale(0.72) rotate(-8deg)", opacity: 0.4 },
+        { transform: "scale(1.24) rotate(5deg)", opacity: 1, offset: 0.48 },
+        { transform: "scale(1) rotate(0deg)", opacity: 1 },
+      ],
+      { duration: 620, easing: "cubic-bezier(.2,.9,.24,1.2)" },
+    );
+    digestButton.animate?.(
+      [
+        { transform: "translateY(-1px) scale(1)" },
+        { transform: "translateY(-2px) scale(1.045)", offset: 0.45 },
+        { transform: "translateY(-1px) scale(1)" },
+      ],
+      { duration: 680, easing: "cubic-bezier(.2,.8,.2,1)" },
+    );
+
+    setTimeout(() => {
+      if (digestButton.isConnected) restoreDigestIdleState();
+    }, 1500);
+  };
+
+  // A compact signal pill: indigo structure, one violet highlight, and a
+  // tiny cyan rim. It stays distinct from YouTube's red play controls.
   digestButton.style.cssText = `
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    padding: 0 18px;
-    height: 36px;
-    border: none;
-    border-radius: 18px;
-    background: #c8674f;
+    gap: 8px;
+    padding: 0 17px 0 6px;
+    height: 38px;
+    border: 1px solid rgba(127, 151, 255, 0.44);
+    border-radius: 19px;
+    background: linear-gradient(135deg, #4d58cf 0%, #715cf1 62%, #5c79ee 100%);
     color: white;
     font-family: "Roboto", "Arial", sans-serif;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.1px;
     cursor: pointer;
     margin-right: 8px;
-    transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-    box-shadow: 0 2px 8px rgba(200, 103, 79, 0.3);
+    transition: background 0.2s, transform 0.16s, box-shadow 0.2s, border-color 0.2s;
+    box-shadow: 0 7px 18px rgba(66, 65, 172, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.18);
     flex: 0 0 auto;
     align-self: center;
     width: max-content;
@@ -266,30 +426,75 @@ function createDigestButton() {
 
   // Hover effects
   digestButton.addEventListener("mouseenter", () => {
-    digestButton.style.background = "#b25742";
-    digestButton.style.transform = "scale(1.02)";
+    if (isOpening) return;
+    digestButton.style.background =
+      "linear-gradient(135deg, #424dbf 0%, #6650e5 62%, #4d6fe4 100%)";
+    digestButton.style.borderColor = "rgba(148, 213, 255, 0.68)";
+    digestButton.style.boxShadow =
+      "0 10px 24px rgba(66, 65, 172, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.2)";
+    digestButton.style.transform = "translateY(-1px)";
   });
 
   digestButton.addEventListener("mouseleave", () => {
-    digestButton.style.background = "#c8674f";
-    digestButton.style.transform = "scale(1)";
+    if (isOpening) return;
+    digestButton.style.background =
+      "linear-gradient(135deg, #4d58cf 0%, #715cf1 62%, #5c79ee 100%)";
+    digestButton.style.borderColor = "rgba(127, 151, 255, 0.44)";
+    digestButton.style.boxShadow =
+      "0 7px 18px rgba(66, 65, 172, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.18)";
+    digestButton.style.transform = "translateY(0)";
   });
 
   // Click handler — open the side panel
   digestButton.addEventListener("click", async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isOpening) return;
+    isOpening = true;
 
-    debugLog("[YouTube Digest] Digest button clicked");
+    const label = digestButton.querySelector?.(".ytd-digest-label");
+    if (label) label.textContent = ui("打开中…", "Opening...");
+    digestButton.setAttribute(
+      "aria-label",
+      ui("正在打开 TranslatorX", "Opening TranslatorX"),
+    );
+    digestButton
+      .querySelector?.(".ytd-digest-avatar")
+      ?.animate?.(
+        [
+          { transform: "translateY(0) scale(1)" },
+          { transform: "translateY(-2px) scale(1.06)" },
+          { transform: "translateY(0) scale(1)" },
+        ],
+        { duration: 540, iterations: 2, easing: "ease-in-out" },
+      );
+
+    debugLog("[TranslatorX] Digest button clicked");
 
     // Send message to background script to open side panel
     try {
       const result = await chrome.runtime.sendMessage({
         action: "openSidePanel",
       });
-      debugLog("[YouTube Digest] openSidePanel response:", result);
+      if (!result?.success) {
+        throw new Error(result?.error || "Chrome could not open the side panel");
+      }
+      showDigestOpenSuccess();
+      debugLog("[TranslatorX] openSidePanel response:", result);
     } catch (err) {
-      console.error("[YouTube Digest] Failed to open side panel:", err);
+      console.error("[TranslatorX] Failed to open side panel:", err);
+      if (label) label.textContent = ui("请重试", "Retry");
+      digestButton.style.background = "#3f438e";
+      digestButton.setAttribute(
+        "aria-label",
+        ui("打开失败，请重试", "Could not open. Try again"),
+      );
+      digestButton.title = err?.message || "Could not open TranslatorX";
+      setTimeout(() => {
+        if (!digestButton.isConnected) return;
+        restoreDigestIdleState();
+        digestButton.title = "";
+      }, 2200);
     }
   });
 
@@ -315,7 +520,7 @@ function injectDigestButton() {
 
   const actionsContainer = findDigestButtonHost();
   if (!actionsContainer) {
-    debugLog("[YouTube Digest Content] Visible actions container not found yet");
+    debugLog("[TranslatorX Content] Visible actions container not found yet");
     return false;
   }
 
@@ -341,7 +546,7 @@ function injectDigestButton() {
     actionsContainer.insertBefore(digestButton, actionsContainer.firstChild);
   }
 
-  debugLog("[YouTube Digest Content] Digest button reconciled");
+  debugLog("[TranslatorX Content] Digest button reconciled");
   return true;
 }
 
@@ -423,7 +628,7 @@ function injectNoteButton() {
 
   if (!playerContainer) {
     debugLog(
-      "[YouTube Digest Content] Player container not found yet, will retry",
+      "[TranslatorX Content] Player container not found yet, will retry",
     );
     return;
   }
@@ -436,20 +641,19 @@ function injectNoteButton() {
     playerContainer.style.position = "relative";
   }
 
-  debugLog("[YouTube Digest Content] Injecting note button");
+  debugLog("[TranslatorX Content] Injecting note button");
 
-  // Create the note button — a soft rounded pill that floats over the player
+  // Create the note button — a cool signal pill that floats over the player.
   const noteButton = document.createElement("button");
   noteButton.id = "ytd-note-button";
-  noteButton.innerHTML = `
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right: 7px;">
-      <path d="M12 20h9"></path>
-      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-    </svg>
-    <span>Note</span>
-  `;
+  noteButton.dataset.txState = "idle";
+  noteButton.innerHTML = noteButtonMarkup(ui("笔记", "Note"));
+  noteButton.setAttribute(
+    "aria-label",
+    ui("保存当前时间点为笔记", "Save the current timestamp as a note"),
+  );
 
-  // Soft rounded pill in the terracotta accent, with a gentle shadow.
+  // Keep this in the same visual family as the primary TranslatorX action.
   // Start hidden; visibility is controlled by mouse activity.
   noteButton.style.cssText = `
     position: absolute;
@@ -459,7 +663,7 @@ function injectNoteButton() {
     display: flex;
     align-items: center;
     padding: 9px 16px;
-    background: #c8674f;
+    background: linear-gradient(135deg, #4d58cf 0%, #715cf1 100%);
     color: white;
     border: none;
     border-radius: 999px;
@@ -471,7 +675,7 @@ function injectNoteButton() {
     transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
     opacity: 0;
     pointer-events: none;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    box-shadow: 0 7px 20px rgba(27, 29, 87, 0.38), inset 0 1px 0 rgba(255,255,255,0.16);
   `;
 
   ytdNoteButton = noteButton;
@@ -496,14 +700,14 @@ function injectNoteButton() {
 
   // Hover effect — lift slightly
   noteButton.addEventListener("mouseenter", () => {
-    noteButton.style.background = "#b25742";
-    noteButton.style.boxShadow = "0 6px 18px rgba(0,0,0,0.35)";
+    noteButton.style.background = "linear-gradient(135deg, #424dbf 0%, #6650e5 100%)";
+    noteButton.style.boxShadow = "0 10px 24px rgba(27,29,87,0.44)";
     noteButton.style.transform = "translateY(-1px)";
   });
 
   noteButton.addEventListener("mouseleave", () => {
-    noteButton.style.background = "#c8674f";
-    noteButton.style.boxShadow = "0 4px 14px rgba(0,0,0,0.3)";
+    noteButton.style.background = "linear-gradient(135deg, #4d58cf 0%, #715cf1 100%)";
+    noteButton.style.boxShadow = "0 7px 20px rgba(27,29,87,0.38)";
     noteButton.style.transform = "translateY(0)";
   });
 
@@ -516,7 +720,7 @@ function injectNoteButton() {
 
   playerContainer.appendChild(noteButton);
 
-  debugLog("[YouTube Digest Content] Note button injected");
+  debugLog("[TranslatorX Content] Note button injected");
 }
 
 function showNoteButton() {
@@ -546,14 +750,18 @@ function resetNoteButtonTimer() {
 function handleNoteKeyboardShortcut(e) {
   if (!window.location.pathname.includes("/watch")) return;
   if (e.key !== "n" && e.key !== "N") return;
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
 
-  // Ignore if the user is typing in an input/textarea/contenteditable
-  const active = document.activeElement;
+  // Ignore if the user is typing in a search box, form control, or editable
+  // surface. event.target is important now that this listener runs in capture.
+  const active = e.target || document.activeElement;
   if (
     active &&
     (active.tagName === "INPUT" ||
       active.tagName === "TEXTAREA" ||
-      active.isContentEditable)
+      active.tagName === "SELECT" ||
+      active.isContentEditable ||
+      active.closest?.('[contenteditable="true"], [role="textbox"]'))
   ) {
     return;
   }
@@ -561,6 +769,7 @@ function handleNoteKeyboardShortcut(e) {
   // Prevent YouTube's own "n" shortcut (e.g. next video in playlist)
   e.preventDefault();
   e.stopPropagation();
+  e.stopImmediatePropagation?.();
 
   // Show brief visual feedback on the button, then save
   showNoteButton();
@@ -572,12 +781,12 @@ function handleNoteKeyboardShortcut(e) {
  * Captures the current timestamp and saves it as a note.
  */
 async function saveCurrentNote() {
-  debugLog("[YouTube Digest] Saving note");
+  debugLog("[TranslatorX] Saving note");
 
   const video = document.querySelector("video.html5-main-video");
   if (!video) {
-    console.error("[YouTube Digest] No video element found");
-    return;
+    console.error("[TranslatorX] No video element found");
+    return { success: false, error: "No active YouTube video found" };
   }
 
   // Go back 3 seconds to capture what was just said (user reacts after hearing it)
@@ -586,14 +795,13 @@ async function saveCurrentNote() {
   const videoId = new URLSearchParams(window.location.search).get("v");
 
   const noteButton = ytdNoteButton;
-  const originalContent = noteButton ? noteButton.innerHTML : "";
-
   if (noteButton) {
-    noteButton.innerHTML =
-      '<span style="letter-spacing: 0.2px;">SAVING...</span>';
+    noteButton.dataset.txState = "saving";
+    noteButton.innerHTML = `<span style="letter-spacing: 0.2px;">${ui("保存中…", "SAVING...")}</span>`;
     noteButton.style.pointerEvents = "none";
   }
 
+  let outcome;
   try {
     const result = await chrome.runtime.sendMessage({
       action: "saveNote",
@@ -605,33 +813,44 @@ async function saveCurrentNote() {
 
     if (result.success) {
       if (noteButton) {
-        noteButton.innerHTML =
-          '<span style="letter-spacing: 0.2px;">SAVED</span>';
-        noteButton.style.background = "#7c8b6f";
+        noteButton.dataset.txState = "saved";
+        noteButton.innerHTML = `<span style="letter-spacing: 0.2px;">${ui("已保存", "SAVED")}</span>`;
+        noteButton.style.background = "#438b98";
       }
       showNoteSavedToast(result.note);
+      outcome = { success: true, note: result.note };
     } else {
       if (noteButton) {
-        noteButton.innerHTML =
-          '<span style="letter-spacing: 0.2px;">ERROR</span>';
+        noteButton.dataset.txState = "error";
+        noteButton.innerHTML = `<span style="letter-spacing: 0.2px;">${ui("错误", "ERROR")}</span>`;
       }
-      console.error("[YouTube Digest] Save note error:", result.error);
+      console.error("[TranslatorX] Save note error:", result.error);
+      outcome = {
+        success: false,
+        error: result.error || "Could not save note",
+      };
     }
   } catch (err) {
     if (noteButton) {
-      noteButton.innerHTML =
-        '<span style="letter-spacing: 0.2px;">ERROR</span>';
+      noteButton.dataset.txState = "error";
+      noteButton.innerHTML = `<span style="letter-spacing: 0.2px;">${ui("错误", "ERROR")}</span>`;
     }
-    console.error("[YouTube Digest] Save note exception:", err);
+    console.error("[TranslatorX] Save note exception:", err);
+    outcome = {
+      success: false,
+      error: err?.message || "Could not save note",
+    };
   }
 
   setTimeout(() => {
     if (noteButton) {
-      noteButton.innerHTML = originalContent;
-      noteButton.style.background = "#c8674f";
+      noteButton.dataset.txState = "idle";
+      noteButton.innerHTML = noteButtonMarkup(ui("笔记", "Note"));
+      noteButton.style.background = "linear-gradient(135deg, #4d58cf 0%, #715cf1 100%)";
       noteButton.style.pointerEvents = "auto";
     }
   }, 2000);
+  return outcome;
 }
 
 /**
@@ -645,11 +864,11 @@ function showNoteSavedToast(note) {
   const toast = document.createElement("div");
   toast.id = "ytd-note-toast";
   toast.innerHTML = `
-    <div style="font-weight: 700; margin-bottom: 6px; color: #c8674f;">📝 Note saved</div>
-    <div style="font-size: 12px; color: #6b6258; margin-bottom: 8px;">${escapeHtmlForContent(note.timestamp)} — ${escapeHtmlForContent(note.videoTitle)}</div>
-    <div style="font-size: 13px; line-height: 1.55; color: #2e2a24;">"${escapeHtmlForContent(note.text)}"</div>
+    <div style="font-weight: 700; margin-bottom: 6px; color: #5b5bd6;">📝 ${ui("笔记已保存", "Note saved")}</div>
+    <div style="font-size: 12px; color: #66708f; margin-bottom: 8px;">${escapeHtmlForContent(note.timestamp)} · ${escapeHtmlForContent(note.videoTitle)}</div>
+    <div style="font-size: 13px; line-height: 1.55; color: #171a3d;">"${escapeHtmlForContent(note.text)}"</div>
     <div style="margin-top: 10px; font-size: 11px;">
-      <a href="${escapeHtmlForContent(note.timestampedUrl)}" style="color: #c8674f; font-weight: 600; text-decoration: none;">🔗 Copy link</a>
+      <a href="${escapeHtmlForContent(note.timestampedUrl)}" style="color: #5b5bd6; font-weight: 600; text-decoration: none;">🔗 ${ui("复制链接", "Copy link")}</a>
     </div>
   `;
 
@@ -659,11 +878,11 @@ function showNoteSavedToast(note) {
     right: 20px;
     z-index: 999999;
     background: #ffffff;
-    border: 1px solid #ece5d9;
+    border: 1px solid #dde2f2;
     border-radius: 14px;
     padding: 16px 20px;
     max-width: 350px;
-    box-shadow: 0 12px 32px rgba(50, 42, 32, 0.2);
+    box-shadow: 0 16px 38px rgba(26, 30, 82, 0.22);
     font-family: system-ui, -apple-system, "Roboto", sans-serif;
     animation: ytdSlideIn 0.3s ease;
   `;
@@ -683,7 +902,7 @@ function showNoteSavedToast(note) {
     e.preventDefault();
     try {
       await navigator.clipboard.writeText(note.timestampedUrl);
-      e.target.textContent = "✓ Copied!";
+      e.target.textContent = ui("✓ 已复制", "✓ Copied!");
     } catch (err) {
       console.error("Copy failed:", err);
     }
@@ -772,11 +991,11 @@ function highlightKeyMoments(moments, videoDuration) {
 function seekToTimestamp(seconds) {
   const video = document.querySelector("video.html5-main-video");
   if (!video) {
-    console.error("[YouTube Digest Content] No video element found for seek");
+    console.error("[TranslatorX Content] No video element found for seek");
     return;
   }
 
-  debugLog("[YouTube Digest Content] Seeking to:", seconds);
+  debugLog("[TranslatorX Content] Seeking to:", seconds);
   video.currentTime = seconds;
   // Also play the video if it's paused
   if (video.paused) {

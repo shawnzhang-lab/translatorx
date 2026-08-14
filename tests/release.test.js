@@ -5,6 +5,11 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const readPngSize = (file) => {
+  const data = fs.readFileSync(path.join(root, file));
+  assert.deepEqual([...data.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  return [data.readUInt32BE(16), data.readUInt32BE(20)];
+};
 
 test("manifest uses minimized install-time permissions", () => {
   const manifest = JSON.parse(read("manifest.json"));
@@ -14,10 +19,52 @@ test("manifest uses minimized install-time permissions", () => {
   assert.equal(manifest.minimum_chrome_version, "116");
   assert.equal(packageJson.version, manifest.version);
   assert.equal(manifest.options_ui.page, "options.html");
+  assert.equal(manifest.homepage_url, "https://github.com/shawnzhang-lab/translatorx");
+  assert.equal(
+    packageJson.repository.url,
+    "git+https://github.com/shawnzhang-lab/translatorx.git",
+  );
+  assert.equal(
+    packageJson.bugs.url,
+    "https://github.com/shawnzhang-lab/translatorx/issues",
+  );
   assert.ok(!manifest.permissions.includes("activeTab"));
   assert.ok(manifest.host_permissions.includes("https://api.deepseek.com/*"));
   assert.equal(Object.hasOwn(manifest, "optional_host_permissions"), false);
-  assert.equal(manifest.version, "1.1.4");
+  assert.equal(manifest.version, "1.5.13");
+});
+
+test("extension icons use the TranslatorX mascot at every declared size", () => {
+  const manifest = JSON.parse(read("manifest.json"));
+  const expected = {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png",
+  };
+
+  assert.deepEqual(manifest.icons, expected);
+  assert.deepEqual(manifest.action.default_icon, expected);
+  for (const [size, file] of Object.entries(expected)) {
+    assert.deepEqual(readPngSize(file), [Number(size), Number(size)]);
+  }
+
+  const buttonAvatars = [
+    "icons/translatorx-button-avatar-48.png",
+    "icons/translatorx-success-ok-48.png",
+  ];
+  const exposedResources = new Set(
+    manifest.web_accessible_resources.flatMap((entry) => entry.resources),
+  );
+  for (const file of buttonAvatars) {
+    assert.deepEqual(readPngSize(file), [48, 48]);
+    assert.ok(exposedResources.has(file));
+  }
+
+  const contentScript = read("content.js");
+  assert.match(contentScript, /translatorx-button-avatar-48\.png/);
+  assert.match(contentScript, /translatorx-success-ok-48\.png/);
+  assert.match(contentScript, /showDigestOpenSuccess\(\)/);
+  assert.match(contentScript, /label\.textContent = ui\("已打开", "Opened"\)/);
 });
 
 test("release copy documents current scope without em dashes", () => {
@@ -31,14 +78,27 @@ test("release copy documents current scope without em dashes", () => {
   assert.doesNotMatch(manifest.description, /—/);
   assert.doesNotMatch(packageJson.description, /—/);
 
-  assert.equal(manifest.name, "YouTube Digest");
-  assert.equal(packageJson.name, "youtube-digest");
-  assert.match(read("scripts/package-extension.sh"), /youtube-digest-v\$version\.zip/);
-  assert.doesNotMatch(
-    [readme, chineseReadme, read("PRIVACY.md"), read("SECURITY.md")].join("\n"),
-    /\bYT Digest\b/,
+  assert.equal(manifest.name, "TranslatorX");
+  assert.equal(packageJson.name, "translatorx");
+  assert.match(
+    read("scripts/package-extension.sh"),
+    /translatorx-v\$version\.zip/,
   );
-  assert.match(readme, /^# YouTube Digest$/m);
+  assert.match(read(".github/workflows/ci.yml"), /dist\/translatorx-v\*\.zip/);
+  assert.match(
+    read("scripts/package-extension.sh"),
+    /Windows\/System32\/tar\.exe -a -c -f/,
+  );
+  assert.doesNotMatch(
+    [
+      read("PRIVACY.md"),
+      read("SECURITY.md"),
+      manifest.description,
+      packageJson.description,
+    ].join("\n"),
+    /youtube translatorX|YouTube Digest|\bYT Digest\b/i,
+  );
+  assert.match(readme, /^# TranslatorX$/m);
   assert.match(
     readme,
     /Turn every YouTube video into a resource for deep learning\./,
@@ -47,7 +107,7 @@ test("release copy documents current scope without em dashes", () => {
   assert.match(readme, /^## Install with your coding agent$/m);
   assert.match(
     readme,
-    /permanent folder I choose[\s\S]*tell me its exact full path[\s\S]*If I need a suggestion during this first installation[\s\S]*`~\/Documents\/youtube-digest`[\s\S]*`%USERPROFILE%\\Documents\\youtube-digest`[\s\S]*do not assume either path/,
+    /permanent folder I choose[\s\S]*tell me its exact full path[\s\S]*If I need a suggestion during this first installation[\s\S]*`~\/Documents\/translatorx`[\s\S]*`%USERPROFILE%\\Documents\\translatorx`[\s\S]*do not assume either path/,
   );
   assert.match(
     readme,
@@ -61,14 +121,26 @@ test("release copy documents current scope without em dashes", () => {
     readme,
     /Select the exact project folder you chose, which must contain `manifest\.json`/,
   );
-  assert.match(readme, /upstream issues and pull requests are not accepted/i);
+  assert.match(readme, /github\.com\/shawnzhang-lab\/translatorx\/issues/i);
+  assert.match(
+    readme,
+    /independent derivative of \[YouTube Digest by Zara Zhang\]/i,
+  );
+  const englishAttributionStart = readme.indexOf(
+    "\n## Project lineage and attribution",
+  );
+  assert.ok(englishAttributionStart > 0);
+  assert.doesNotMatch(
+    readme.slice(0, englishAttributionStart),
+    /zarazhangrui\/youtube-digest/i,
+  );
   assert.doesNotMatch(readme, /^## Contributing$/m);
-  assert.match(chineseReadme, /^# YouTube Digest$/m);
+  assert.match(chineseReadme, /^# TranslatorX$/m);
   assert.match(chineseReadme, /把每个 YouTube 视频变成一份可以深入学习的资料/);
   assert.match(chineseReadme, /^## 让你的编程 Agent 帮你安装$/m);
   assert.match(
     chineseReadme,
-    /我选择的长期保留文件夹[\s\S]*告诉我准确的完整路径[\s\S]*第一次安装时需要位置建议[\s\S]*`~\/Documents\/youtube-digest`[\s\S]*`%USERPROFILE%\\Documents\\youtube-digest`[\s\S]*不要假设我一定使用这些路径/,
+    /我选择的长期保留文件夹[\s\S]*告诉我准确的完整路径[\s\S]*第一次安装时需要位置建议[\s\S]*`~\/Documents\/translatorx`[\s\S]*`%USERPROFILE%\\Documents\\translatorx`[\s\S]*不要假设我一定使用这些路径/,
   );
   assert.match(
     chineseReadme,
@@ -82,10 +154,28 @@ test("release copy documents current scope without em dashes", () => {
     chineseReadme,
     /选择你刚才确定的那个准确项目文件夹，其中必须包含 `manifest\.json`/,
   );
-  assert.match(chineseReadme, /不接受上游 Issue 或 Pull Request/);
+  assert.match(chineseReadme, /github\.com\/shawnzhang-lab\/translatorx\/issues/i);
+  assert.match(chineseReadme, /独立衍生项目/);
+  const chineseAttributionStart = chineseReadme.indexOf("\n## 项目来源与署名");
+  assert.ok(chineseAttributionStart > 0);
+  assert.doesNotMatch(
+    chineseReadme.slice(0, chineseAttributionStart),
+    /zarazhangrui\/youtube-digest/i,
+  );
   assert.match(chineseReadme, /增加更多翻译语言/);
 
+  const notice = read("NOTICE");
+  assert.match(notice, /YouTube Digest/);
+  assert.match(notice, /Zara Zhang/);
+  assert.match(notice, /MIT License/);
+  assert.match(read("scripts/check-release.sh"), /"NOTICE"/);
+
   assert.match(readme, /100 credits per month/i);
+  assert.match(readme, /optional \*\*Supadata API key\*\*/i);
+  assert.match(
+    readme,
+    /captions directly from the open YouTube player[\s\S]*Supadata is not contacted/,
+  );
   assert.match(readme, /native transcript request uses \*\*1 credit\*\*/i);
   assert.match(readme, /generated transcript costs \*\*2 credits per video minute\*\*/i);
   assert.match(readme, /HTTP `206` still uses \*\*1 credit\*\*/i);
@@ -111,61 +201,97 @@ test("release copy documents current scope without em dashes", () => {
   assert.match(chineseReadme, /\u7ea6 32,600 \u4e2a\u8f93\u5165 token/);
   assert.match(chineseReadme, /\$0\.002[^\n]*\$0\.006 USD/);
   assert.match(chineseReadme, /dash\.supadata\.ai\/auth\/sign-up/i);
+  assert.match(chineseReadme, /可选的 \*\*Supadata API Key\*\*/);
+  assert.match(chineseReadme, /直接读取成功时不会联系 Supadata/);
   assert.match(chineseReadme, /platform\.deepseek\.com\/api_keys/i);
-  assert.match(readme, /^### The Digest button is missing on a YouTube video$/m);
+  assert.match(readme, /^### The TranslatorX button is missing on a YouTube video$/m);
   assert.match(
     chineseReadme,
-    /^### YouTube 视频页面没有显示 Digest 按钮$/m,
+    /^### YouTube 视频页面没有显示 TranslatorX 按钮$/m,
   );
 
   const optionsPage = read("options.html");
   const optionsStyles = read("options.css");
   const optionsScript = read("options.js");
+  const sidepanelStyles = read("sidepanel.css");
   assert.match(optionsPage, /dash\.supadata\.ai\/auth\/sign-up/i);
+  assert.match(optionsPage, /href="https:\/\/supadata\.ai\/"/i);
+  assert.match(optionsPage, /href="https:\/\/docs\.supadata\.ai\/get-transcript"/i);
+  assert.match(optionsPage, /Supadata API key \(optional\)/);
+  assert.match(optionsPage, /contacted only if direct retrieval fails/);
+  assert.match(optionsPage, /TranslatorX Settings/);
+  assert.match(optionsPage, /使用你自己的 API Key/);
+  assert.match(optionsPage, /字幕备用服务/);
+  assert.match(optionsPage, /AI 服务商/);
+  assert.match(optionsPage, /保存设置/);
+  assert.match(optionsPage, /本地数据/);
+  assert.match(optionsPage, /lang="en"/);
+  assert.match(optionsScript, /ui\("正在保存…", "Saving…"\)/);
+  assert.match(optionsScript, /ui\("请填写 DeepSeek API Key。", "Add a DeepSeek API key\."\)/);
+  assert.match(read("sidepanel.html"), /<span lang="zh-CN">设置<\/span><span lang="en">Settings<\/span>/);
+  assert.match(read("sidepanel.html"), />字幕<[\s\S]*?>Transcript</);
+  assert.match(read("sidepanel.html"), />概览<[\s\S]*?>Overview</);
+  assert.match(read("sidepanel.html"), />笔记<[\s\S]*?>Notes</);
+  assert.match(read("sidepanel.js"), /ui\("缺少 API Key", "API Key Missing"\)/);
+  assert.match(read("sidepanel.js"), /ui\("打开设置", "Open Settings"\)/);
   assert.match(optionsPage, /platform\.deepseek\.com\/api_keys/i);
+  assert.match(optionsPage, /href="https:\/\/www\.deepseek\.com\/"/i);
+  assert.match(optionsPage, /href="https:\/\/api-docs\.deepseek\.com\/"/i);
+  assert.match(optionsPage, /<span lang="zh-CN">官网<\/span><span lang="en">Official site<\/span>/);
+  assert.match(optionsPage, /<span lang="zh-CN">获取 Key<\/span><span lang="en">Get API key<\/span>/);
+  assert.match(optionsPage, /<span lang="zh-CN">API 文档<\/span><span lang="en">API docs<\/span>/);
   assert.doesNotMatch(optionsPage, /<select\b/i);
   assert.doesNotMatch(optionsPage, /id="(?:provider|aiBaseUrl|aiModel)"/);
-  const detailsTag = optionsPage.match(
-    /<details\b[^>]*class="card customization-card"[^>]*>/,
-  );
-  assert.ok(detailsTag, "Expected a native Local remix details disclosure");
-  assert.doesNotMatch(detailsTag[0], /\sopen(?:\s|=|>)/i);
-  assert.match(
-    optionsPage,
-    /<summary class="customization-summary">[\s\S]*Want to use another AI model\?[\s\S]*Copy a safe prompt for your coding agent[\s\S]*<\/summary>/,
-  );
-  assert.match(
-    optionsPage,
-    /Before copying, open the[\s\S]*exact YouTube Digest project folder that Chrome loaded through[\s\S]*Load unpacked[\s\S]*For a first-time installation, optional permanent[\s\S]*~\/Documents\/youtube-digest[\s\S]*%USERPROFILE%\\Documents\\youtube-digest[\s\S]*suggestions, not assumed paths/,
-  );
-  assert.match(
-    optionsPage,
-    /Chrome and the extension[\s\S]*cannot reliably reveal or copy the actual OS path/,
-  );
-  assert.match(optionsPage, /id="copyCustomizationPromptBtn"/);
-  assert.match(optionsStyles, /\.customization-summary:hover\s*\{/);
-  assert.match(optionsStyles, /\.customization-summary:focus-visible\s*\{/);
+  assert.doesNotMatch(optionsPage, /customization|local remix|其他 AI 模型/i);
+  assert.doesNotMatch(optionsStyles, /customization|agent-badge/i);
   assert.match(optionsStyles, /\.data-card\s*\{[^}]*margin-top:\s*36px;/);
-  assert.match(optionsScript, /navigator\.clipboard\.writeText/);
-  assert.match(optionsScript, /Customization prompt copied\./);
+  assert.doesNotMatch(optionsScript, /customization|copyCustomizationPrompt/i);
   assert.match(optionsScript, /migration\.migrated[\s\S]*chrome\.storage\.local\.set/);
-
-  const customizationPrompt = `Customize my local copy of YouTube Digest to use [PROVIDER] with [MODEL]. Work only in the currently open workspace. Before editing anything, verify that this workspace contains manifest.json and that its name is YouTube Digest. If verification fails, stop and tell me: "Open the exact YouTube Digest project folder that Chrome loaded through Load unpacked in your coding agent, then paste this prompt again." Do not search other folders or the whole disk, edit a guessed copy, assume an installation path, or claim that Chrome or the extension can reveal the absolute OS source path. Update the API endpoint, request format, and minimum Chrome host permissions needed for that provider. Preserve the bring-your-own-key model and local Chrome storage. Keep all API keys out of source code, commits, logs, screenshots, and this chat; after the code is ready, tell me where I should enter the key myself. Keep DeepSeek-specific fields and retries provider-scoped, update README.md, README.zh-CN.md, PRIVACY.md, SECURITY.md, and the tests, then run npm test, npm run check, and npm run package. Finally, explain how to reload the unpacked extension and test it on a real YouTube video.`;
-  assert.ok(optionsPage.includes(`>${customizationPrompt}</textarea>`));
-  assert.doesNotMatch(customizationPrompt, /Documents|USERPROFILE/);
+  assert.doesNotMatch(optionsScript, /Add a Supadata API key/);
+  assert.match(
+    sidepanelStyles,
+    /url\("icons\/translatorx-waiting-sprite\.png"\)/,
+  );
+  assert.match(sidepanelStyles, /@keyframes translatorxMascotFrames/);
+  assert.ok(
+    fs.existsSync(path.join(root, "icons/translatorx-waiting-sprite.png")),
+  );
+  assert.match(
+    read("scripts/check-release.sh"),
+    /icons\/translatorx-waiting-sprite\.png/,
+  );
+  assert.match(
+    sidepanelStyles,
+    /url\("icons\/translatorx-thinking-192\.png"\)/,
+  );
+  assert.match(sidepanelStyles, /@keyframes explainThinkingBob/);
+  assert.match(
+    sidepanelStyles,
+    /#transcriptList\.is-following-playback[\s\S]*min-height:\s*clamp\(148px, 21vh, 188px\)/,
+  );
+  assert.match(
+    sidepanelStyles,
+    /#transcriptList\.is-following-playback[\s\S]*\.transcript-text\s*\{[\s\S]*font-size:\s*15px/,
+  );
+  assert.doesNotMatch(sidepanelStyles, /transcript-source-badge|source-dot--subs/);
+  assert.doesNotMatch(
+    read("sidepanel.js"),
+    /transcriptSourceBadge|getTranscriptSourceLabel|Supadata 备用|Supadata fallback/,
+  );
+  assert.ok(
+    fs.existsSync(path.join(root, "icons/translatorx-thinking-192.png")),
+  );
+  assert.match(
+    read("scripts/check-release.sh"),
+    /icons\/translatorx-thinking-192\.png/,
+  );
+  assert.match(read("sidepanel.js"), /renderExplainWaitingState/);
+  assert.match(read("sidepanel.js"), /setInterval\([\s\S]*2600\)/);
 
   assert.match(readme, /^## Remix it with your coding agent$/m);
   assert.match(readme, /more translation languages/i);
   assert.match(readme, /customized summary templates/i);
   assert.match(readme, /vocabulary notebook/i);
-  assert.match(
-    readme,
-    /first open the exact YouTube Digest project folder that Chrome loaded through \*\*Load unpacked\*\* in your coding agent/,
-  );
-  assert.match(
-    chineseReadme,
-    /先在编程 Agent 中打开 Chrome 通过“加载已解压的扩展程序”使用的那个准确的 YouTube Digest 项目文件夹/,
-  );
 
   const publishedDocs = [
     readme,
@@ -188,11 +314,11 @@ test("notes filters preserve selected contrast and expose pressed state", () => 
 
   assert.match(
     html,
-    /id="notesFilterThis"[\s\S]*?aria-pressed="true"[\s\S]*?>[\s\S]*?This Video/,
+    /id="notesFilterThis"[\s\S]*?aria-pressed="true"[\s\S]*?>[\s\S]*?<span lang="zh-CN">当前视频<\/span><span lang="en">This Video<\/span>/,
   );
   assert.match(
     html,
-    /id="notesFilterAll"[\s\S]*?aria-pressed="false"[\s\S]*?>[\s\S]*?All Notes/,
+    /id="notesFilterAll"[\s\S]*?aria-pressed="false"[\s\S]*?>[\s\S]*?<span lang="zh-CN">全部笔记<\/span><span lang="en">All Notes<\/span>/,
   );
   assert.match(
     css,
@@ -246,6 +372,7 @@ test("published prompt files contain runtime sections", () => {
       "Shared base rules",
       "Chinese rules",
       "Transcript batch translation",
+      "Overview and notes translation",
     ],
   };
 
