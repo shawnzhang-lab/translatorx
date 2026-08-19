@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TranslatorX",
-  "version": "1.5.13",
+  "version": "1.5.14",
   "minimum_chrome_version": "116",
   "description": "TranslatorX turns YouTube videos into bilingual transcripts, AI overviews, and timestamped notes.",
   "homepage_url": "https://github.com/shawnzhang-lab/translatorx",
