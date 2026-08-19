@@ -2,38 +2,38 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-把每个 YouTube 视频变成一份可以深入学习的资料。TranslatorX 把字幕、双语翻译、AI 概览、内容讲解和时间戳笔记放进同一个 Chrome 侧边栏，让你可以持续学习视频中的知识和语言，同时不丢失原视频上下文。
+把每个 YouTube 视频变成一份可以深入学习的资料。TranslatorX 把字幕、双语翻译、AI 概览、内容讲解和时间戳笔记放进同一个 Chromium 侧边栏，让你可以持续学习视频中的知识和语言，同时不丢失原视频上下文。
 
 - 把零碎字幕变成清晰、可搜索的学习资料。
 - 字幕默认以中英双语打开，也可切换原文或简体中文；TranslatorX 会记住你上次选择的字幕视图。
 - 预翻译开头 30 段字幕，同时优先翻译当前播放行和用户手动浏览到的字幕。
 - 等待翻译时显示动态 TranslatorX-chan 图标，并从 100 条二次元等待文案中随机抽取提示。
 - 通过 AI 概览、章节、重点引用和可切换英文、中文、双语视图的选中文本讲解建立系统理解，并自动记住默认讲解语言。
-- 可在任意已保存笔记下补充自己的评论、联想和下一步行动。这些灵感只保存在 Chrome 本地，不会调用 AI API。
+- 可在任意已保存笔记下补充自己的评论、联想和下一步行动。这些灵感只保存在浏览器本地，不会调用 AI API。
 - 界面默认使用中文，可通过侧边栏和设置页右上角的 **English** 按钮切换为完整英文界面；这不会改变字幕或解释的输出语言。
 - 点击字幕、概览或笔记中的时间戳，快速跳转到对应位置。
 - 播放时自动滚动字幕，让当前正在朗读的字幕保持在视觉中央附近；使用滚轮、触摸、滚动条或键盘手动滚动时会暂停跟随。
 - 保存自动润色的时间戳笔记，方便之后复习。
 - 在中英文双语设置页中配置 API Key。
-- 使用自己的 API Key，数据保存在本地 Chrome 中，不包含分析统计或行为追踪。
+- 使用自己的 API Key，数据保存在浏览器本地，不包含分析统计或行为追踪。
 
-TranslatorX 是一个需要自行提供 API Key 的开源项目，通过 GitHub 安装。目前没有上架 Chrome 应用商店，不赠送 API 额度，也没有开发者运营的服务器。
+TranslatorX 是一个需要自行提供 API Key 的开源项目，通过 GitHub 安装。目前没有上架 Chrome 应用商店或 Microsoft Edge 加载项商店，不赠送 API 额度，也没有开发者运营的服务器。
 
 ## 让你的编程 Agent 帮你安装
 
 你不需要看懂代码，也不需要会使用命令行。把下面这段话发送给你的编程 Agent：
 
-> 请把 TranslatorX 下载或克隆到我选择的长期保留文件夹，告诉我准确的完整路径，并让 Chrome“加载已解压的扩展程序”使用同一个文件夹。如果我在第一次安装时需要位置建议，可以推荐 macOS 或 Linux 上的 `~/Documents/translatorx`，或 Windows 上的 `%USERPROFILE%\Documents\translatorx`，但不要假设我一定使用这些路径。请用简单易懂的语言一步一步指导我完成安装和配置。https://github.com/shawnzhang-lab/translatorx
+> 请把 TranslatorX 下载或克隆到我选择的长期保留文件夹，告诉我准确的完整路径，并让 Chrome 或 Edge 的“加载已解压的扩展程序”使用同一个文件夹。如果我在第一次安装时需要位置建议，可以推荐 macOS 或 Linux 上的 `~/Documents/translatorx`，或 Windows 上的 `%USERPROFILE%\Documents\translatorx`，但不要假设我一定使用这些路径。请用简单易懂的语言一步一步指导我完成安装和配置。https://github.com/shawnzhang-lab/translatorx
 
 你的 Agent 应该帮你：
 
 1. 先询问你想把项目长期保存在哪里，再下载或克隆到那里，并告诉你准确的完整路径。如果你需要建议，可以推荐 macOS 或 Linux 上的 `~/Documents/translatorx`，或 Windows 上的 `%USERPROFILE%\Documents\translatorx`。
 2. 打开 DeepSeek 官方页面，指导你创建必需的 AI 账号。只有需要可选字幕兜底时才打开 Supadata。
-3. 指导你在 Chrome 中通过“加载已解压的扩展程序”选择你刚才确定的那个准确项目文件夹。
+3. 指导你在 Chrome 或 Edge 中通过“加载已解压的扩展程序”选择你刚才确定的那个准确项目文件夹。
 4. 告诉你应该在扩展的“设置”页面哪个位置填写 API Key。
 5. 打开一个带字幕的 YouTube 视频，确认字幕和翻译功能可以使用。
 
-安装后请让这个文件夹留在原位。如果移动或删除它，Chrome 中加载的本地扩展会失效，需要从新的长期存放位置重新加载。
+安装后请让这个文件夹留在原位。如果移动或删除它，浏览器中加载的本地扩展会失效，需要从新的长期存放位置重新加载。
 
 不要把 API Key 发送到 AI 对话、源代码、截图或公开消息中。请你自己在 TranslatorX 的设置页面直接填写。编程 Agent 可以告诉你填写位置，但不需要看到 Key。
 
@@ -44,13 +44,13 @@ TranslatorX 是一个需要自行提供 API Key 的开源项目，通过 GitHub 
 1. 打开 [github.com/shawnzhang-lab/translatorx](https://github.com/shawnzhang-lab/translatorx)。
 2. 点击 **Code**，再选择 **Download ZIP**。
 3. 选择一个长期保留的文件夹，并把项目解压到这里。可选建议是 macOS 或 Linux 上的 `~/Documents/translatorx`，或 Windows 上的 `%USERPROFILE%\Documents\translatorx`。你也可以使用其他文件夹。
-4. 在 Chrome 地址栏打开 `chrome://extensions`。
+4. 打开扩展管理页：Chrome 使用 `chrome://extensions`，Edge 使用 `edge://extensions`。
 5. 打开右上角的“开发者模式”。
 6. 点击“加载已解压的扩展程序”。
 7. 选择你刚才确定的那个准确项目文件夹，其中必须包含 `manifest.json`。
-8. 如果需要，可以在 Chrome 扩展菜单中固定 TranslatorX。
+8. 如果需要，可以在浏览器的扩展菜单中固定 TranslatorX。
 
-这是一个本地加载的扩展，不会自动更新。下载新版或让 Agent 修改代码后，请在 `chrome://extensions` 中找到 TranslatorX 并点击“重新加载”，然后刷新已经打开的 YouTube 页面。如果移动或删除源代码文件夹，Chrome 中加载的扩展会失效，需要从新的位置重新加载。
+这是一个本地加载的扩展，不会自动更新。下载新版或让 Agent 修改代码后，请在 `chrome://extensions` 或 `edge://extensions` 中找到 TranslatorX 并点击“重新加载”，然后刷新已经打开的 YouTube 页面。如果移动或删除源代码文件夹，浏览器中加载的扩展会失效，需要从新的位置重新加载。
 
 ## 设置 API Key
 
@@ -82,7 +82,7 @@ TranslatorX 会先从当前打开的 YouTube 播放器直接读取人工字幕�
 
 当前账号和接口说明请查看 [DeepSeek 官方 API 文档](https://api-docs.deepseek.com/)。
 
-在侧边栏中打开 **Settings**。你也可以在 `chrome://extensions` 的 TranslatorX 卡片中打开扩展选项。Key 只能粘贴到这些设置输入框中。不要把 Key 发送到 AI 对话、项目文件、截图或公开消息中。
+在侧边栏中打开 **Settings**。你也可以在 `chrome://extensions` 或 `edge://extensions` 的 TranslatorX 卡片中打开扩展选项。Key 只能粘贴到这些设置输入框中。不要把 Key 发送到 AI 对话、项目文件、截图或公开消息中。
 
 发布版本只支持 DeepSeek V4 Flash：
 
@@ -93,7 +93,7 @@ Model: deepseek-v4-flash
 
 TranslatorX 会让所有 DeepSeek 请求使用非思考模式，以获得更快、更稳定的交互。设置中的接口地址和模型固定，只需要填写 DeepSeek API Key。
 
-API Key 和设置保存在你设备上的 Chrome 扩展本地存储中。发布包不会包含或使用 `config.js`。
+API Key 和设置保存在你设备上的浏览器扩展本地存储中。发布包不会包含或使用 `config.js`。
 
 ## 使用 TranslatorX
 
@@ -107,7 +107,7 @@ API Key 和设置保存在你设备上的 Chrome 扩展本地存储中。发布�
 
 ## 当前支持范围
 
-- Chrome 116 或更高版本。
+- Chrome 116 或更高版本，以及支持 Side Panel API 的当前 Microsoft Edge 版本。两个浏览器共用同一个解压文件夹和同一套安装步骤。
 - 标准的 `youtube.com/watch` 视频页面。
 - 从当前 YouTube 播放器直接读取的人工字幕和自动生成字幕。TranslatorX 会优先使用英文字幕，也可能显示其他可用语言。
 - 如果直接读取失败并且配置了 Key，可以使用 Supadata 兜底。
@@ -116,7 +116,7 @@ API Key 和设置保存在你设备上的 Chrome 扩展本地存储中。发布�
 - 带个人灵感的本地笔记，以及最近字幕、概览和翻译的本地缓存。
 - 发布版本的所有 AI 功能都使用 DeepSeek V4 Flash。其他服务需要修改本地代码，不属于发布版本的支持范围。
 
-Shorts、直播、私密视频、受访问限制的视频，以及没有原生字幕的视频可能无法使用。目前没有测试 Firefox、Safari、移动浏览器或其他 Chromium 浏览器。
+Shorts、直播、私密视频、受访问限制的视频，以及没有原生字幕的视频可能无法使用。Firefox、Safari、移动浏览器、Brave、Vivaldi、Opera 和其他 Chromium 浏览器暂未进入正式测试支持范围。
 
 使用可选的 Supadata 兜底时，TranslatorX 会强制使用 `mode=native`，不会在没有原生字幕时请求 AI 生成转录，也不会在本地转录音频。
 
@@ -173,7 +173,7 @@ TranslatorX 会直接从扩展向服务商发送请求：
 1. 先直接读取 YouTube 提供的可用字幕轨道。只有直接读取失败并且你配置了可选兜底时，才会把标准化的视频地址发送给 Supadata 请求原生字幕。
 2. 当你使用 AI 功能时，把字幕和相关视频信息发送给 DeepSeek。
 3. 翻译或讲解等功能只发送当前需要的内容，例如选中的文本和上下文，或少量字幕分段。
-4. API Key、设置、笔记和最近缓存保存在 Chrome 本地。
+4. API Key、设置、笔记和最近缓存保存在浏览器本地。
 
 TranslatorX 没有账号系统、广告、分析统计或行为追踪。YouTube 和你实际启用的可选服务仍会按照各自的条款和隐私政策处理数据。详情请查看 [PRIVACY.md](PRIVACY.md)。
 
@@ -181,7 +181,7 @@ TranslatorX 没有账号系统、广告、分析统计或行为追踪。YouTube 
 
 ### YouTube 视频页面没有显示 TranslatorX 按钮
 
-- 在 `chrome://extensions` 中找到 TranslatorX，点击“重新加载”，然后刷新 YouTube 页面。
+- 在 `chrome://extensions` 或 `edge://extensions` 中找到 TranslatorX，点击“重新加载”，然后刷新 YouTube 页面。
 - 确认当前页面是标准 `https://www.youtube.com/watch?...` 页面，而不是 Shorts、嵌入页面或直播页面。
 - 当前版本会在 YouTube 响应式操作栏变化时自动重新定位按钮。页面加载完成后可以稍等片刻。
 - 如果你使用的是较早下载的版本，可以先横向调整一次 YouTube 窗口宽度让按钮出现，然后下载最新版，这样之后不再需要调整窗口。
@@ -190,7 +190,7 @@ TranslatorX 没有账号系统、广告、分析统计或行为追踪。YouTube 
 ### 侧边栏无法打开
 
 - 确认你打开的是标准 `https://www.youtube.com/watch?...` 页面。
-- 在 `chrome://extensions` 中确认 TranslatorX 已启用，并点击“重新加载”。
+- 在 `chrome://extensions` 或 `edge://extensions` 中确认 TranslatorX 已启用，并点击“重新加载”。
 - 重新加载扩展后，刷新 YouTube 页面。
 - 如果问题仍然存在，让你的编程 Agent 检查扩展。
 
@@ -227,7 +227,7 @@ npm run check
 npm run package
 ```
 
-Agent 还应该在 Chrome 中重新加载扩展，并测试多个真实 YouTube 视频。自动检查通过，不代表真实服务请求和 YouTube 交互一定正常。
+Agent 还应该在 Chrome 或 Edge 中重新加载扩展，并测试多个真实 YouTube 视频。自动检查通过，不代表真实服务请求和 YouTube 交互一定正常。
 
 ## 项目来源与署名
 

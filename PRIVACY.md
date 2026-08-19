@@ -2,7 +2,7 @@
 
 Effective: July 28, 2026
 
-TranslatorX is a GitHub-only, bring-your-own-key Chrome extension. It has no TranslatorX account, developer-operated backend, analytics, advertising, or telemetry.
+TranslatorX is a GitHub-only, bring-your-own-key Chromium extension for Chrome and Edge. It has no TranslatorX account, developer-operated backend, analytics, advertising, or telemetry.
 
 ## Data the extension handles
 
@@ -42,9 +42,9 @@ Those services process data under their own terms, privacy policies, retention p
 
 ## Local storage and retention
 
-TranslatorX uses Chrome's local extension storage, not a TranslatorX cloud service.
+TranslatorX uses the browser's local extension storage, not a TranslatorX cloud service.
 
-- Supadata and DeepSeek settings and API keys remain on the device in Chrome's extension storage.
+- Supadata and DeepSeek settings and API keys remain on the device in the browser's extension storage.
 - Saved notes remain until you delete them or remove/clear the extension's data. The extension keeps up to 100 notes.
 - Recent transcript, digest, and transcript or overview translation cache entries are stored
   locally. The cache is limited to 20 videos, and entries older than 30 days are
@@ -54,20 +54,20 @@ TranslatorX uses Chrome's local extension storage, not a TranslatorX cloud servi
 - The preferred Explain display mode (English, Simplified Chinese, or bilingual)
   is stored locally until you change it or reset the extension's data.
 
-Chrome extension storage is not a password vault. Anyone with sufficient access to your browser profile or device may be able to recover locally stored keys or content. Use scoped keys where providers support them, set spending limits, and rotate or revoke a key if the device or browser profile is compromised.
+Browser extension storage is not a password vault. Anyone with sufficient access to your browser profile or device may be able to recover locally stored keys or content. Use scoped keys where providers support them, set spending limits, and rotate or revoke a key if the device or browser profile is compromised.
 
 To remove data:
 
 - delete individual saved notes in TranslatorX;
 - use the Options page to clear cached digests, delete all notes, or reset all extension data;
-- remove the extension or clear its stored data from Chrome to delete all local settings, keys, notes, and cache entries; and
+- remove the extension or clear its stored data from the browser to delete all local settings, keys, notes, and cache entries; and
 - revoke keys in the Supadata or DeepSeek dashboard to stop their future use.
 
 Clearing local data does not delete information already processed or retained by Supadata or DeepSeek. Use each service's controls for service-side requests.
 
 ## Permissions
 
-TranslatorX uses Chrome permissions for these purposes:
+TranslatorX uses Chromium extension permissions for these purposes:
 
 - `sidePanel`: display the TranslatorX interface beside YouTube.
 - `storage`: store settings, keys, notes, and cached results locally.

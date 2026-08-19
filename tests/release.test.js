@@ -17,6 +17,8 @@ test("manifest uses minimized install-time permissions", () => {
 
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.minimum_chrome_version, "116");
+  assert.ok(manifest.permissions.includes("sidePanel"));
+  assert.equal(manifest.side_panel.default_path, "sidepanel.html");
   assert.equal(packageJson.version, manifest.version);
   assert.equal(manifest.options_ui.page, "options.html");
   assert.equal(manifest.homepage_url, "https://github.com/shawnzhang-lab/translatorx");
@@ -31,7 +33,7 @@ test("manifest uses minimized install-time permissions", () => {
   assert.ok(!manifest.permissions.includes("activeTab"));
   assert.ok(manifest.host_permissions.includes("https://api.deepseek.com/*"));
   assert.equal(Object.hasOwn(manifest, "optional_host_permissions"), false);
-  assert.equal(manifest.version, "1.5.13");
+  assert.equal(manifest.version, "1.5.14");
 });
 
 test("extension icons use the TranslatorX mascot at every declared size", () => {
@@ -115,7 +117,7 @@ test("release copy documents current scope without em dashes", () => {
   );
   assert.match(
     readme,
-    /selecting the exact project folder you chose in Chrome with \*\*Load unpacked\*\*/,
+    /selecting the exact project folder you chose in Chrome or Edge with \*\*Load unpacked\*\*/,
   );
   assert.match(
     readme,
@@ -144,7 +146,7 @@ test("release copy documents current scope without em dashes", () => {
   );
   assert.match(
     chineseReadme,
-    /如果移动或删除源代码文件夹，Chrome 中加载的扩展会失效，需要从新的位置重新加载。/,
+    /如果移动或删除源代码文件夹，浏览器中加载的扩展会失效，需要从新的位置重新加载。/,
   );
   assert.match(
     chineseReadme,
@@ -163,6 +165,22 @@ test("release copy documents current scope without em dashes", () => {
     /zarazhangrui\/youtube-digest/i,
   );
   assert.match(chineseReadme, /增加更多翻译语言/);
+  assert.match(
+    readme,
+    /`chrome:\/\/extensions` in Chrome or `edge:\/\/extensions` in Edge/,
+  );
+  assert.match(
+    chineseReadme,
+    /Chrome 使用 `chrome:\/\/extensions`，Edge 使用 `edge:\/\/extensions`/,
+  );
+  assert.match(
+    readme,
+    /Google Chrome 116 or newer and current Microsoft Edge releases/,
+  );
+  assert.match(
+    chineseReadme,
+    /Chrome 116 或更高版本，以及支持 Side Panel API 的当前 Microsoft Edge 版本/,
+  );
 
   const notice = read("NOTICE");
   assert.match(notice, /YouTube Digest/);

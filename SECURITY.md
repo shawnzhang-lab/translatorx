@@ -39,6 +39,6 @@ Examples include:
 - Use dedicated, scoped API keys where possible and set provider spending limits.
 - Do not reuse keys from production systems.
 - Revoke keys immediately if a device, browser profile, ZIP, log, or screenshot exposes them.
-- Remember that Chrome local extension storage is not an encrypted password vault.
+- Remember that browser local extension storage is not an encrypted password vault.
 
 The release tooling uses an explicit file allowlist and scans public files for common credential patterns, but automated checks cannot detect every secret.
